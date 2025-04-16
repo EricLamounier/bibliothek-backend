@@ -4,15 +4,15 @@ import { verifyJWT } from '../utils/jwt';
 
 interface LivroProps {
     id?: number;
-    nome: string;
-    autorId: number[];
+    titulo: string;
+    autores: {id: number, sync: number}[];
     editora: string;
     edicao: string;
     isbn: string;
     genero: string;
     dataPublicacao: string;
-    quantidadeTotal: number;
-    quantidadeDisponivel: number;
+    quantidadetotal: number;
+    quantidadedisponivel: number;
     localizacao: string;
     observacao: string;
     situacao: number;
@@ -26,7 +26,7 @@ export const postLivro = async(request: FastifyRequest, reply: FastifyReply) => 
     console.log(livro)
 
     try {
-        if (!livro.nome) {
+        if (!livro.titulo) {
             return reply.status(400).send({ message: "Livro's name required!" });
         }
 
@@ -49,9 +49,9 @@ export const postLivro = async(request: FastifyRequest, reply: FastifyReply) => 
             RETURNING *
         `;
         const dataLivro = [
-            livro.nome,
-            livro.quantidadeTotal,
-            livro.quantidadeTotal,
+            livro.titulo,
+            livro.quantidadetotal,
+            livro.quantidadetotal,
             livro.isbn,
             livro.edicao,
             livro.localizacao,
@@ -64,14 +64,14 @@ export const postLivro = async(request: FastifyRequest, reply: FastifyReply) => 
         const { rows: [insertedBook] } = await pool.query(queryLivro, dataLivro);
 
         // Insert author relationships
-        if (livro.autorId && livro.autorId.length > 0) {
+        if (livro.autores && livro.autores.length > 0) {
             const queryAutorLivro = `
                 INSERT INTO LIVRO_AUTOR (AUTOR_ID, LIVRO_ID)
                 VALUES ($1, $2)
             `;
 
-            for (const autorId of livro.autorId) {
-                await pool.query(queryAutorLivro, [autorId, insertedBook.id]);
+            for (const autor of livro.autores) {
+                await pool.query(queryAutorLivro, [autor.id, insertedBook.id]);
             }
         }
 
@@ -108,7 +108,7 @@ export const getLivro = async (request: FastifyRequest, reply: FastifyReply) => 
             
             return {
                 ...livro,
-                autorId: autores.map(autor => autor.autor_id)
+                autores: autores.map(autor => ({ id: autor.autor_id, sync: 0 }))
             };
         }));
 
