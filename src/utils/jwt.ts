@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
-const dotenv = require('dotenv')
+const dotenv = require('dotenv');
+const bcrypt = require('bcrypt');
 
 dotenv.config()
 
@@ -17,4 +18,12 @@ export const verifyJWT = async (userJWT : string) => {
         }
         return decoded;
     });
+};
+
+export async function hashPassword(password: string): Promise<string> {
+    return await bcrypt.hash(password, 9);
+};
+
+export async function comparePassword(password: string, hash: string): Promise<boolean> {
+    return await bcrypt.compare(password, hash);
 };

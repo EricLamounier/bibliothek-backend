@@ -53,12 +53,16 @@ export const getDisciplina = async (request: FastifyRequest, reply: FastifyReply
     const query = `SELECT * FROM DISCIPLINA`;
     const { rows } = await pool.query(query);
 
+    //console.log(rows)
+
     reply.status(200).send({ message: 'Disciplinas fetched successfully!', data: rows });
 };
 
 export const deleteDisciplina = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { disciplinaID } = request.query as {disciplinaID : number};
+    const { disciplinaID } = request.body as {disciplinaID : number[]};
     const token = request.cookies.token;
+
+    console.log(request.body)
 
     try{
         if(!disciplinaID){
@@ -76,12 +80,13 @@ export const deleteDisciplina = async (request: FastifyRequest, reply: FastifyRe
         }
 
         await pool.query('BEGIN');
-        const data = [disciplinaID];
-        const query = 'DELETE FROM DISCIPLINA WHERE ID = $1';
-        const { rows } = await pool.query(query, data);
+        const ids = disciplinaID.map(d => d.id);
+        const placeholders = ids.map((_, index) => `$${index + 1}`).join(", ");
+        const query = `DELETE FROM DISCIPLINA WHERE ID IN (${placeholders})`;
+        await pool.query(query, ids);
         await pool.query('COMMIT');
 
-        reply.status(200).send({ message: 'Disciplina deleted successfully!', data:  rows[0]});
+        reply.status(200).send({ message: 'Disciplina deleted successfully!', data:  'sucess'});
     }catch(err){
         reply.status(200).send({ message: 'Disciplina not deleted!', data: err });
     }

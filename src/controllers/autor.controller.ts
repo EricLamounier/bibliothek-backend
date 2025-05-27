@@ -40,7 +40,7 @@ export const postAutor = async(request: FastifyRequest, reply: FastifyReply) => 
  
         reply.status(200).send({ message: 'Autor inserted successfully!', data:  rows[0]});
     }catch(err){
-        reply.status(200).send({ message: 'Autor not inserted!', data: err });
+        reply.status(500).send({ message: 'Autor not inserted!', data: err });
     }
 };
 
@@ -83,7 +83,7 @@ export const deleteAutor = async (request: FastifyRequest, reply: FastifyReply) 
 
         reply.status(200).send({ message: 'Autor deleted successfully!', data:  rows[0]});
     }catch(err){
-        reply.status(200).send({ message: 'Autor not deleted!', data: err });
+        reply.status(500).send({ message: 'Autor not deleted!', data: err });
     }
 
 
@@ -117,6 +117,6 @@ export const putAutor = async (request: FastifyRequest, reply: FastifyReply) => 
         reply.status(200).send({ message: 'Autor updated successfully!', data:  rows[0]});
 
     }catch(err){
-        reply.status(200).send({ message: 'Autor not updated!', data: err });
+        reply.status(500).send({ message: 'Autor not updated!', data: err });
     }
 };
