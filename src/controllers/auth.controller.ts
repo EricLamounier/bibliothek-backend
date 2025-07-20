@@ -1,10 +1,9 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
-import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 import pool from '../config/db';
 import { comparePassword, createJWT, hashPassword, verifyJWT } from '../utils/jwt';
-import { generateCode, sendEmails } from '../utils/gmail';
-import { pwdCodes } from '../utils/recuperacaoSenha';
+import { deleteImages, processAndUploadImage } from '../utils/imagekit';
+import { MultipartFile } from '@fastify/multipart';
 
 dotenv.config();
 
@@ -12,7 +11,8 @@ export const authLogin = async (request: FastifyRequest, reply: FastifyReply) =>
     try{
         const { email, password } = request.body as { email: string; password: string };
 
-        const { rows } = await pool.query("SELECT FUN.*, PES.SITUACAO FROM FUNCIONARIO FUN JOIN PESSOA PES ON FUN.PESSOA_ID = PES.ID  WHERE EMAIL = $1 AND PES.SITUACAO = 1 LIMIT 1", [email]);
+        const { rows } = await pool.query("SELECT FUN.*, PES.SITUACAO FROM FUNCIONARIO FUN JOIN PESSOA PES ON FUN.CODIGOPESSOA = PES.CODIGOPESSOA WHERE EMAIL = $1 LIMIT 1", [email]);
+
         if (rows.length === 0) {
             return reply.code(401).send({ error: "Usuário ou senha incorretos!" });
         }
@@ -25,15 +25,14 @@ export const authLogin = async (request: FastifyRequest, reply: FastifyReply) =>
             return reply.code(401).send({ error: "Usuário ou senha incorretos!" });
         }
 
-        const JWTToken = await createJWT(rows[0].id);
-
+        const JWTToken = await createJWT(rows[0].codigopessoa);
 
         reply
             .setCookie('token', JWTToken, { // Correção do nome da variável
                 httpOnly: true,
-                secure: false, // tesntando
                 maxAge: 3600000, // 1 hora
-                sameSite: 'strict',
+                secure: true, // tesntando
+                sameSite: 'none',
                 path: '/',
             })
             .code(200)
@@ -53,31 +52,18 @@ export const authJWT = async(request: FastifyRequest, reply: FastifyReply) => {
     if(resp){
         const query = `
             SELECT 
-                FUN.ID AS ID,
-                PES.ID AS pessoa_id,
-                PES.NOME,
-                PES.CONTATO,
-                PES.IMAGEM,
-                PES.TIPO,
-                PES.OBSERVACAO,
-                PES.SITUACAO,
-                FUN.USUARIO,
-                FUN.EMAIL,
-                FUN.DATAADMISSAO,
-                FUN.PRIVILEGIO	
-            FROM PESSOA PES JOIN FUNCIONARIO FUN ON PES.ID = FUN.PESSOA_ID
-            WHERE PES.TIPO = 2 AND FUN.ID = $1 LIMIT 1
+                FUN.*,
+                PES.*
+            FROM PESSOA PES JOIN FUNCIONARIO FUN ON PES.CODIGOPESSOA = FUN.CODIGOPESSOA
+            WHERE PES.TIPOPESSOA = 2 AND FUN.CODIGOFUNCIONARIO = $1 LIMIT 1
         `
-        const data = [resp.userID]
+        const data = [resp.funcionarioID]
         const result = await pool.query(query, data)
-        const user = result.rows[0]
+        const funcionario = result.rows[0]
 
-        const userFormated = {
-            ...user,
-            imagem: user.imagem ? `https://ik.imagekit.io/bibliothek/PessoasImagens/${user.imagem}.png` : null,
-        }
+        const { senha, ...funcionarioFormated } = funcionario;
 
-        reply.status(200).send({ message: 'Logged successfully!', data: userFormated });
+        reply.status(200).send({ message: 'Logged successfully!', data: funcionarioFormated });
     }else{
         reply.status(401).send({ message: 'Invalid JWT Token!' });
     }
@@ -103,15 +89,45 @@ export const authRegister = async (request: FastifyRequest, reply: FastifyReply)
 
 export const putConta = async (request: FastifyRequest, reply: FastifyReply) => {
     try{
-        const { conta } = request.body
+        const { conta: contaField, image } = request.body as { conta: { value: string }, image?: MultipartFile };
+        const conta = JSON.parse(contaField.value);
 
+        console.log(conta)     
+        
         if(conta.novaSenha){ // Verifica se senha anterior esta correta
-            const { rows } = await pool.query("SELECT SENHA FROM FUNCIONARIO WHERE ID = $1 AND PESSOA_ID = $2 LIMIT 1", [conta.funcionarioid, conta.pessoaid]);
+            const { rows } = await pool.query("SELECT SENHA FROM FUNCIONARIO WHERE CODIGOFUNCIONARIO = $1 AND CODIGOPESSOA = $2 LIMIT 1", [conta.codigofuncionario, conta.codigopessoa]);
             if(rows.length === 0){
                 return reply.code(401).send({ error: "Usuário ou senha incorretos!" });
             }
             if(! await comparePassword(conta.senhaAtual, rows[0].senha)){
                 return reply.code(401).send({ error: "Usuário ou senha incorretos!" });
+            }
+        }
+
+        let imagemUrl = null;
+        let imageID = null;
+        const queryImagem = 'SELECT IMAGEM FROM PESSOA WHERE CODIGOPESSOA = $1 LIMIT 1';
+        const { rows: [imagemBDId] } = await pool.query(queryImagem, [conta.codigopessoa]);
+
+        if(image){ // Imagem foi enviada
+            if (imagemBDId.imagem) await deleteImages([imagemBDId.imagem]);
+
+            // Envio nova imagem
+            imageID = await processAndUploadImage(image, '/PessoasImagens');
+
+            // Crio URL com a nova imagem
+            imagemUrl = imageID
+
+        }else{ // Imagem não foi enviada
+            if(conta.imageChanged == 2) { // Imagem prévia removida
+                // Remove imagem do banco e deleta do ImageKit
+                if(imagemBDId.imagem){ // tem imagem no banco
+                    const queryImagem = 'UPDATE PESSOA SET IMAGEM = $1 WHERE CODIGOPESSOA = $2';
+                    await pool.query(queryImagem, [null, conta.codigopessoa]);
+                    await deleteImages([imagemBDId.imagem]);
+                }
+            }else{ // Não alterou a imagem prévia
+                imagemUrl = imagemBDId.imagem ? imagemBDId.imagem : null;
             }
         }
 
@@ -122,26 +138,27 @@ export const putConta = async (request: FastifyRequest, reply: FastifyReply) => 
         const queryFuncionario = `
             UPDATE FUNCIONARIO
             SET 
-                USUARIO = COALESCE($1, USUARIO),
-                SENHA = COALESCE($2, SENHA),
-                EMAIL = COALESCE($3, EMAIL)
-            WHERE ID = $4 AND PESSOA_ID = $5
+                SENHA = COALESCE($1, SENHA),
+                EMAIL = COALESCE($2, EMAIL)
+            WHERE CODIGOFUNCIONARIO = $3 AND CODIGOPESSOA = $4
         `;
-        const dataFuncionario = [conta.username, novaSenha, conta.email, conta.funcionarioid, conta.pessoaid]
+        const dataFuncionario = [novaSenha, conta.email, conta.codigofuncionario, conta.codigopessoa]
         const resultFuncionario = await pool.query(queryFuncionario, dataFuncionario)
 
         const queryPessoa = `
             UPDATE PESSOA
             SET 
                 NOME = COALESCE($1, NOME),
-                CONTATO = COALESCE($2, CONTATO)
-            WHERE ID = $3 AND TIPO = 2
+                CONTATO = COALESCE($2, CONTATO),
+                IMAGEM = COALESCE($3, IMAGEM)
+            WHERE CODIGOPESSOA = $4 AND TIPOPESSOA = 2
         `;
-        const dataPessoa = [conta.nome, conta.contato, conta.pessoaid]
+        const dataPessoa = [conta.nome, conta.contato, imagemUrl, conta.codigopessoa]
         const resultPessoa = await pool.query(queryPessoa, dataPessoa);
 
         const novaConta = {
-            ...conta
+            ...conta,
+            imagem: imagemUrl
         }
 
         await pool.query('COMMIT');
@@ -153,64 +170,3 @@ export const putConta = async (request: FastifyRequest, reply: FastifyReply) => 
         reply.code(400).send({ message: "Something went wrong!", data: err });
     }
 }
-
-export const otp = async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-        const { email } = request.body as { email: string };
-        const { rows } = await pool.query(`
-            SELECT FUN.EMAIL, PES.NOME 
-            FROM FUNCIONARIO FUN JOIN PESSOA PES ON FUN.PESSOA_ID = PES.ID 
-            WHERE EMAIL = $1 AND PES.SITUACAO = 1 LIMIT 1
-        `, [email]);
-
-        if (rows.length === 0) {
-            return reply.code(401).send({ error: "Usuário ou senha incorretos!" });
-        }
-
-        const message = `Hey, ${rows[0].nome}! Aqui está seu código de verificação. Ele tem validade de 10 minutos!`;
-        const code = generateCode();
-
-        // Se já existe um código para o e-mail, limpa o timeout anterior
-        if (pwdCodes.has(email)) {
-            const existing = pwdCodes.get(email);
-            if (existing) {
-                clearTimeout(existing.timeout);
-            }
-        }
-
-        const timeout = setTimeout(() => {
-            pwdCodes.delete(email);
-        }, 600000);
-
-        pwdCodes.set(email, { code, expiresAt: new Date(Date.now() + 600000), timeout });
-
-        await sendEmails(rows[0].nome, rows[0].email, code, message, 'Recuperação de acesso');
-
-        reply.status(200).send({ message: 'Código de verificação enviado com sucesso!', data: rows[0] });
-        await pool.query('COMMIT');
-    } catch (err) {
-        reply.code(400).send({ message: "Something went wrong!", data: err });
-    }
-};
-
-export const resetPasswordOtp = async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-        const { email, code } = request.body as { email: string; code: string };
-        if (!pwdCodes.has(email)) {
-            return reply.code(401).send({ error: "Código de verificação inválido!" });
-        }
-        const { code: storedCode, expiresAt } = pwdCodes.get(email)!;
-        if (code !== storedCode) {
-            return reply.code(401).send({ error: "Código de verificação inválido!" });
-        }
-        if (expiresAt < new Date()) {
-            return reply.code(401).send({ error: "Código de verificação expirado!" });
-        }
-
-        pwdCodes.delete(email);
-
-        reply.status(200).send({ message: 'Código de verificação válido!' });
-    } catch (err) {
-        reply.code(400).send({ message: "Something went wrong!", data: err });
-    }
-};

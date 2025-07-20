@@ -54,6 +54,7 @@ export async function deleteImages(fileIds: string[]): Promise<void> {
     }
   }
 }
+
 export async function processAndUploadImage(imageField: any, folder: string): Promise<string | null> {
   if (!imageField) return null;
 

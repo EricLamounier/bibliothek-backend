@@ -1,5 +1,5 @@
 type CodeEntry = {
-    code: string;
+    otp: string;
     expiresAt: Date;
     timeout: NodeJS.Timeout;
 };

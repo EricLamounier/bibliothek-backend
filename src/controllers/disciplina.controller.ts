@@ -2,12 +2,6 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import pool from '../config/db';
 import { verifyJWT } from '../utils/jwt';
 
-interface DisciplinaProps {
-    userID: number | string;
-    nome: string;
-    observacao?: string;
-};
-
 export const postDisciplina = async(request: FastifyRequest, reply: FastifyReply) => {
     
     const { nome, observacao } = request.body as {nome : string, observacao ?: string};
@@ -44,10 +38,6 @@ export const postDisciplina = async(request: FastifyRequest, reply: FastifyReply
     }
 };
 
-interface DisciplinasPropsGet extends DisciplinaProps {
-    'IDs[]': number[];
-};
-
 export const getDisciplina = async (request: FastifyRequest, reply: FastifyReply) => {
     const { nome, situacao } = request.query as { nome?: string; situacao?: number[] }
     const query = `SELECT * FROM DISCIPLINA`;
@@ -59,13 +49,13 @@ export const getDisciplina = async (request: FastifyRequest, reply: FastifyReply
 };
 
 export const deleteDisciplina = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { disciplinaID } = request.body as {disciplinaID : number[]};
+    const { codigodisciplina } = request.body as {codigodisciplina : number[]};
     const token = request.cookies.token;
 
     console.log(request.body)
 
     try{
-        if(!disciplinaID){
+        if(!codigodisciplina){
             return reply.status(400).send({ message: "Disciplina's ID required!" })
         }
 
@@ -80,9 +70,9 @@ export const deleteDisciplina = async (request: FastifyRequest, reply: FastifyRe
         }
 
         await pool.query('BEGIN');
-        const ids = disciplinaID.map(d => d.id);
+        const ids = codigodisciplina.map(d => d);
         const placeholders = ids.map((_, index) => `$${index + 1}`).join(", ");
-        const query = `DELETE FROM DISCIPLINA WHERE ID IN (${placeholders})`;
+        const query = `DELETE FROM DISCIPLINA WHERE CODIGODISCIPLINA IN (${placeholders})`;
         await pool.query(query, ids);
         await pool.query('COMMIT');
 
@@ -95,11 +85,13 @@ export const deleteDisciplina = async (request: FastifyRequest, reply: FastifyRe
 };
 
 export const putDisciplina = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { disciplinaID, nome, observacao, situacao } = request.body as {disciplinaID : number, nome: string, observacao : string, situacao : number};
+    const { codigodisciplina, nome, observacao, situacao } = request.body as {codigodisciplina : number, nome: string, observacao : string, situacao : number};
     const token = request.cookies.token;
 
+    console.log(request.body)
+
     try{
-        if(!disciplinaID){
+        if(!codigodisciplina){
             return reply.status(400).send({ message: "Disciplina's ID required!" });
         }
 
@@ -114,8 +106,8 @@ export const putDisciplina = async (request: FastifyRequest, reply: FastifyReply
         }
 
         await pool.query('BEGIN');
-        const data = [nome, observacao, situacao, disciplinaID];
-        const query = 'UPDATE DISCIPLINA SET NOME = $1, OBSERVACAO = $2, SITUACAO = $3 WHERE ID = $4';
+        const data = [nome, observacao, situacao, codigodisciplina];
+        const query = 'UPDATE DISCIPLINA SET NOME = $1, OBSERVACAO = $2, SITUACAO = $3 WHERE CODIGODISCIPLINA = $4';
         const { rows } = await pool.query(query, data);
         await pool.query('COMMIT');
 

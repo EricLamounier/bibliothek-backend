@@ -1,7 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import pool from '../config/db';
 import { verifyJWT } from '../utils/jwt';
-import { deleteImage, processAndUploadImage } from '../utils/imagekit';
+import { deleteImages, processAndUploadImage } from '../utils/imagekit';
 import { MultipartFile } from '@fastify/multipart';
 
 interface AlunoProps {
@@ -11,30 +11,18 @@ interface AlunoProps {
 };
 
 export const getAluno = async (request: FastifyRequest, reply: FastifyReply) => {
-    const query = `SELECT 
-                    AL.ID AS id,
+    const query = `SELECT
                     PES.*,
-                    PES.TIPO AS pessoa_tipo,
-                    PES.ID AS pessoa_id,
-                    AL.ID AS aluno_id,
-                    AL.MATRICULA,
-                    AL.DATA_MATRICULA AS datamatricula,
-                    AL.VENCIMENTO_CARTEIRINHA AS datavencimento
+                    AL.*
                     FROM PESSOA PES
-                    JOIN ALUNO AL ON PES.ID = AL.PESSOA_ID
-                    WHERE PES.TIPO = 0
-                    GROUP BY PES.ID, PES.NOME, PES.CONTATO, AL.ID;
+                    JOIN ALUNO AL ON PES.CODIGOPESSOA = AL.CODIGOPESSOA
+                    WHERE PES.TIPOPESSOA = 0
+                    GROUP BY PES.CODIGOPESSOA, PES.NOME, PES.CONTATO, AL.CODIGOALUNO;
                     `;
 
     const { rows : alunos } = await pool.query(query);
-    const formatedAlunos = await Promise.all(alunos.map(async (aluno) => {
-        return {
-            ...aluno,
-            imagem: aluno.imagem ? `https://ik.imagekit.io/bibliothek/PessoasImagens/${aluno.imagem}.png` : null,
-        }
-    }))
-
-    reply.status(200).send({ message: 'Alunos fetched successfully!', data: formatedAlunos });
+    console.log(alunos)
+    reply.status(200).send({ message: 'Alunos fetched successfully!', data: alunos });
 };
 
 export const postAluno = async(request: FastifyRequest, reply: FastifyReply) => {
@@ -42,7 +30,8 @@ export const postAluno = async(request: FastifyRequest, reply: FastifyReply) => 
     const token = request.cookies.token;
 
     const { aluno: alunoField, image } = request.body as { aluno: { value: string }, image?: MultipartFile };
-    const aluno = JSON.parse(alunoField.value);   
+    const aluno = JSON.parse(alunoField.value); 
+    console.log(aluno)  
 
     let imageUrl = null
     try{
@@ -68,29 +57,28 @@ export const postAluno = async(request: FastifyRequest, reply: FastifyReply) => 
         await pool.query('BEGIN');
         
         const dataPessoa = [aluno.nome, aluno.contato, aluno.observacao, imageUrl, 0];
-        const queryPessoa = `INSERT INTO PESSOA (NOME, CONTATO, OBSERVACAO, IMAGEM, TIPO)
+        const queryPessoa = `INSERT INTO PESSOA (NOME, CONTATO, OBSERVACAO, IMAGEM, TIPOPESSOA)
                             VALUES ($1, $2, $3, $4, $5) RETURNING *`;
         const {rows: [pessoaRow]} = await pool.query(queryPessoa, dataPessoa);
 
-        const queryAluno = "INSERT INTO ALUNO (MATRICULA, DATA_MATRICULA, VENCIMENTO_CARTEIRINHA, PESSOA_ID) VALUES ($1, $2, $3, $4) RETURNING *";
-        const data = [aluno.matricula, aluno.datamatricula, aluno.datavencimento, pessoaRow.id]
+        const queryAluno = "INSERT INTO ALUNO (MATRICULA, DATAMATRICULA, DATAVENCIMENTOCARTEIRINHA, CODIGOPESSOA) VALUES ($1, $2, $3, $4) RETURNING *";
+        const data = [aluno.matricula, aluno.datamatricula, aluno.datavencimentocarteirinha, pessoaRow.codigopessoa]
         const {rows: [alunoRow]} = await pool.query(queryAluno, data);
 
         await pool.query('COMMIT');
 
         const createdData = {
-            ...aluno,
-            id: alunoRow.id,
-            pessoa_id: pessoaRow.id,
-            imagem: imageUrl ? `https://ik.imagekit.io/bibliothek/PessoasImagens/${imageUrl}.png` : null,
-            situacao: 1
+            ...pessoaRow,
+            ...alunoRow
         }
+
+        console.log(createdData)
  
         reply.status(200).send({ message: 'Aluno inserted successfully!', data:  createdData});
-    }catch(err){
+    }catch(err : any){
         console.log(err)
-        imageUrl && await deleteImage(imageUrl)
-        reply.status(500).send({ message: 'Aluno not inserted!', data: err });
+        imageUrl && await deleteImages([imageUrl])
+        reply.status(500).send({ message: 'Aluno not inserted!', data: err, errorMessage: err?.message });
     }
 };
 
@@ -116,17 +104,17 @@ export const putAluno = async (request: FastifyRequest, reply: FastifyReply) => 
 
         let imagemUrl = null;
         let imageID = null;
-        const queryImagem = 'SELECT IMAGEM FROM PESSOA WHERE ID = $1 LIMIT 1';
-        const { rows: [imagemBDId] } = await pool.query(queryImagem, [aluno.pessoa_id]);
+        const queryImagem = 'SELECT IMAGEM FROM PESSOA WHERE CODIGOPESSOA = $1 LIMIT 1';
+        const { rows: [imagemBDId] } = await pool.query(queryImagem, [aluno.codigopessoa]);
 
         if(image){ // Imagem foi enviada
-            if (imagemBDId.imagem) await deleteImage(imagemBDId.imagem);
+            if (imagemBDId.imagem) await deleteImages([imagemBDId.imagem]);
 
             // Envio nova imagem
             imageID = await processAndUploadImage(image, '/PessoasImagens');
 
             // Crio URL com a nova imagem
-            imagemUrl = `https://ik.imagekit.io/bibliothek/PessoasImagens/${imageID}.png`
+            imagemUrl = imageID ? imageID : null
 
 
         }else{ // Imagem não foi enviada
@@ -134,28 +122,27 @@ export const putAluno = async (request: FastifyRequest, reply: FastifyReply) => 
             if(aluno.imageChanged == 2) { // Imagem prévia removida
                 // Remove imagem do banco e deleta do ImageKit
                 if(imagemBDId.imagem){ // tem imagem no banco
-                    const queryImagem = 'UPDATE PESSOA SET IMAGEM = $1 WHERE ID = $2';
-                    await pool.query(queryImagem, [null, aluno.id]);
-                    await deleteImage(imagemBDId.imagem);
+                    const queryImagem = 'UPDATE PESSOA SET IMAGEM = $1 WHERE CODIGOPESSOA = $2';
+                    await pool.query(queryImagem, [null, aluno.codigopessoa]);
+                    await deleteImages([imagemBDId.imagem]);
                 }
             }else{ // Não alterou a imagem prévia
-                console.log(imagemBDId)
-                imagemUrl = imagemBDId.imagem ? `https://ik.imagekit.io/bibliothek/PessoasImagens/${imagemBDId.imagem}.png` : null;
+                imagemUrl = imagemBDId.imagem ? imagemBDId.imagem : null;
             }
         }
 
         await pool.query('BEGIN');
-        const queryPessoa = "UPDATE PESSOA SET NOME = $1, CONTATO = $2, IMAGEM = COALESCE($3, IMAGEM), OBSERVACAO = $4, SITUACAO = $5 WHERE ID = $6";
-        const data = [aluno.nome, aluno.contato, imageID, aluno.observacao, aluno.situacao, aluno.pessoa_id];
+        const queryPessoa = "UPDATE PESSOA SET NOME = $1, CONTATO = $2, IMAGEM = COALESCE($3, IMAGEM), OBSERVACAO = $4, SITUACAO = $5 WHERE CODIGOPESSOA = $6";
+        const data = [aluno.nome, aluno.contato, imageID, aluno.observacao, aluno.situacao, aluno.codigopessoa];
         await pool.query(queryPessoa, data);
 
         const queryAluno = `UPDATE ALUNO 
                             SET MATRICULA = $1, 
-                                VENCIMENTO_CARTEIRINHA = $2,
-                                DATA_MATRICULA = $3
-                            WHERE PESSOA_ID = $4
+                                DATAVENCIMENTOCARTEIRINHA = $2,
+                                DATAMATRICULA = $3
+                            WHERE CODIGOPESSOA = $4
                             `;
-        const dataAluno = [aluno.matricula, aluno.datavencimento, aluno.datamatricula, aluno.id];
+        const dataAluno = [aluno.matricula, aluno.datavencimentocarteirinha, aluno.datamatricula, aluno.codigopessoa];
         await pool.query(queryAluno, dataAluno);
 
         const updatedAluno = {
@@ -166,18 +153,18 @@ export const putAluno = async (request: FastifyRequest, reply: FastifyReply) => 
         await pool.query('COMMIT');
 
         reply.status(200).send({ message: 'Aluno updated successfully!', data:  updatedAluno});
-    }catch(err){
+    }catch(err : any){
         console.log(err)
-        reply.status(500).send({ message: 'Aluno not updated!', data: err });
+        reply.status(500).send({ message: 'Aluno not updated!', data: err, errorMessage: err?.message });
     }
 };
 
 export const deleteAluno = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { pessoaID } = request.query as {pessoaID : number};
+    const { codigopessoa } = request.query as {codigopessoa : number};
     const token = request.cookies.token;
 
     try{
-        if(!pessoaID){
+        if(!codigopessoa){
             return reply.status(400).send({ message: "Aluno's ID required!" })
         }
 
@@ -193,23 +180,23 @@ export const deleteAluno = async (request: FastifyRequest, reply: FastifyReply) 
 
         await pool.query('BEGIN');
 
-        const data = [pessoaID];
+        const data = [codigopessoa];
 
-        const queryImagem = 'SELECT IMAGEM FROM PESSOA WHERE ID = $1 LIMIT 1';
+        const queryImagem = 'SELECT IMAGEM FROM PESSOA WHERE CODIGOPESSOA = $1 LIMIT 1';
         const { rows: [imagemId] } = await pool.query(queryImagem, data);
 
-        const queryAluno = 'DELETE FROM ALUNO WHERE PESSOA_ID = $1';
-        const queryPessoa = 'DELETE FROM PESSOA WHERE ID = $1';
+        const queryAluno = 'DELETE FROM ALUNO WHERE CODIGOPESSOA = $1';
+        const queryPessoa = 'DELETE FROM PESSOA WHERE CODIGOPESSOA = $1';
         
         await pool.query(queryAluno, data);
         await pool.query(queryPessoa, data);
 
-        imagemId.imagem && await deleteImage(imagemId.imagem)
+        imagemId.imagem && await deleteImages([imagemId.imagem])
 
         await pool.query('COMMIT');
 
-        reply.status(200).send({ message: 'Aluno deleted successfully!', data:  pessoaID});
-    }catch(err){
-        reply.status(200).send({ message: 'Aluno not deleted!', data: err });
+        reply.status(200).send({ message: 'Aluno deleted successfully!', data:  codigopessoa});
+    }catch(err : any){
+        reply.status(200).send({ message: 'Aluno not deleted!', data: err, errorMessage: err?.message });
     }
 };

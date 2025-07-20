@@ -1,9 +1,9 @@
-const fs = require('fs');
-const path = require('path');
-const nodemailer = require('nodemailer');
+import fs from 'fs';
+import path from 'path';
+import nodemailer from 'nodemailer';
 
 // Ler o arquivo HTML do template
-const templatePath = path.join(__dirname, './template/template.html');
+const templatePath = path.join(__dirname, 'template.html');
 const emailTemplate = fs.readFileSync(templatePath, 'utf8');
 
 // Create a transporter
@@ -53,7 +53,7 @@ export const sendEmails = async(username: any, email: any, code: string, text: s
 		const renderedHtml = renderTemplate(emailTemplate, recipientData, text);
 		
 		const mailOptions = {
-		  from: 'cepf.bibliothek@gmail.com',    // Sender address
+		  from: 'Bibliothek CEPF <cepf.bibliothek@gmail.com>',    // Sender address
 		  to: email.email, // List of recipients
 		  subject: subject,           // Subject line
 		  html: renderedHtml,

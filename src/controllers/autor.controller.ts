@@ -13,10 +13,6 @@ export const postAutor = async(request: FastifyRequest, reply: FastifyReply) => 
     const { nome, observacao } = request.body as {nome : string, observacao ?: string};
     const token = request.cookies.token;
 
-    console.log(nome, observacao);
-
-    console.log(token)
-
     try{
         if (!nome) {
             return reply.status(400).send({ message: "Autor's name required!" });
@@ -44,10 +40,6 @@ export const postAutor = async(request: FastifyRequest, reply: FastifyReply) => 
     }
 };
 
-interface AutorsPropsGet extends AutorProps {
-    'IDs[]': number[];
-};
-
 export const getAutor = async (request: FastifyRequest, reply: FastifyReply) => {
     const { nome, situacao } = request.query as { nome?: string; situacao?: number[] }
     const query = `SELECT * FROM AUTOR`;
@@ -57,11 +49,11 @@ export const getAutor = async (request: FastifyRequest, reply: FastifyReply) => 
 };
 
 export const deleteAutor = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { autorID } = request.query as {autorID : number};
+    const { codigoautor } = request.query as {codigoautor : number};
     const token = request.cookies.token;
 
     try{
-        if(!autorID){
+        if(!codigoautor){
             return reply.status(400).send({ message: "Autor's ID required!" })
         }
 
@@ -76,8 +68,8 @@ export const deleteAutor = async (request: FastifyRequest, reply: FastifyReply) 
         }
 
         await pool.query('BEGIN');
-        const data = [autorID];
-        const query = 'DELETE FROM AUTOR WHERE ID = $1';
+        const data = [codigoautor];
+        const query = 'DELETE FROM AUTOR WHERE CODIGOAUTOR = $1';
         const { rows } = await pool.query(query, data);
         await pool.query('COMMIT');
 
@@ -90,11 +82,11 @@ export const deleteAutor = async (request: FastifyRequest, reply: FastifyReply) 
 };
 
 export const putAutor = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { autorID, nome, observacao, situacao } = request.body as {autorID : number, nome: string, observacao : string, situacao : number};
+    const { codigoautor, nome, observacao, situacao } = request.body as {codigoautor : number, nome: string, observacao : string, situacao : number};
     const token = request.cookies.token;
 
     try{
-        if(!autorID){
+        if(!codigoautor){
             return reply.status(400).send({ message: "Autor's ID required!" });
         }
 
@@ -109,8 +101,8 @@ export const putAutor = async (request: FastifyRequest, reply: FastifyReply) => 
         }
 
         await pool.query('BEGIN');
-        const data = [nome, observacao, situacao, autorID];
-        const query = 'UPDATE AUTOR SET NOME = $1, OBSERVACAO = $2, SITUACAO = $3 WHERE ID = $4';
+        const data = [nome, observacao, situacao, codigoautor];
+        const query = 'UPDATE AUTOR SET NOME = $1, OBSERVACAO = $2, SITUACAO = $3 WHERE CODIGOAUTOR = $4';
         const { rows } = await pool.query(query, data);
         await pool.query('COMMIT');
 

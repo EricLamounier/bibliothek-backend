@@ -1,46 +1,24 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import pool from '../config/db';
 import { verifyJWT, hashPassword } from '../utils/jwt';
-import { sendEmails, generateTempPassword } from '../utils/gmail';
-import { deleteImage, processAndUploadImage } from '../utils/imagekit';
+import { sendEmails, generateTempPassword } from '../gmail/gmail';
+import { deleteImages, processAndUploadImage } from '../utils/imagekit';
 import { MultipartFile } from '@fastify/multipart';
-
-interface FuncionarioProps {
-    userID: number | string;
-    nome: string;
-    observacao?: string;
-};
 
 export const getFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
     const query = `SELECT 
-                    FUN.ID AS ID,
-                    PES.ID AS pessoa_id,
-                    PES.NOME,
-                    PES.CONTATO,
-                    PES.IMAGEM,
-                    PES.TIPO,
-                    PES.OBSERVACAO,
-                    PES.SITUACAO,
-                    FUN.USUARIO,
+                    PES.*,
+                    FUN.CODIGOFUNCIONARIO,
                     FUN.EMAIL,
                     FUN.DATAADMISSAO,
                     FUN.PRIVILEGIO	
-                FROM PESSOA PES JOIN FUNCIONARIO FUN ON PES.ID = FUN.PESSOA_ID
-                WHERE PES.TIPO = 2;
-                    `;
+                FROM PESSOA PES JOIN FUNCIONARIO FUN ON PES.CODIGOPESSOA = FUN.CODIGOFUNCIONARIO
+                WHERE PES.TIPOPESSOA = 2;
+            `;
 
     const { rows : funcionarios } = await pool.query(query);
-    console.log(funcionarios)
-    const formatedFuncionarios = await Promise.all(funcionarios.map(async (funcionario) => {
-        return {
-            ...funcionario,
-            imagem: funcionario.imagem ? `https://ik.imagekit.io/bibliothek/PessoasImagens/${funcionario.imagem}.png` : null,
-        }
-    }))
 
-    console.log(formatedFuncionarios)
-
-    reply.status(200).send({ message: 'Funcionarios fetched successfully!', data: formatedFuncionarios });
+    reply.status(200).send({ message: 'Funcionarios fetched successfully!', data: funcionarios });
 };
 
 export const postFuncionario = async(request: FastifyRequest, reply: FastifyReply) => {
@@ -74,7 +52,7 @@ export const postFuncionario = async(request: FastifyRequest, reply: FastifyRepl
         await pool.query('BEGIN');
         
         const dataPessoa = [funcionario.nome, funcionario.contato, funcionario.observacao, imageUrl, 2];
-        const queryPessoa = `INSERT INTO PESSOA (NOME, CONTATO, OBSERVACAO, IMAGEM, TIPO)
+        const queryPessoa = `INSERT INTO PESSOA (NOME, CONTATO, OBSERVACAO, IMAGEM, TIPOPESSOA)
                             VALUES ($1, $2, $3, $4, $5) RETURNING *`;
         const {rows: [pessoaRow]} = await pool.query(queryPessoa, dataPessoa);
 
@@ -84,38 +62,38 @@ export const postFuncionario = async(request: FastifyRequest, reply: FastifyRepl
 
         console.log(tempPassword, hashedPassword)
 
-        const queryFuncionario = "INSERT INTO FUNCIONARIO (USUARIO, EMAIL, DATAADMISSAO, PRIVILEGIO, SENHA, PESSOA_ID) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *";
-        const data = [funcionario.usuario, funcionario.email, funcionario.dataadmissao, funcionario.privilegio, hashedPassword, pessoaRow.id]
+        const queryFuncionario = "INSERT INTO FUNCIONARIO (USUARIO, EMAIL, DATAADMISSAO, PRIVILEGIO, SENHA, CODIGOPESSOA) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *";
+        const data = [funcionario.usuario, funcionario.email, funcionario.dataadmissao, funcionario.privilegio, hashedPassword, pessoaRow.codigoPessoa]
         const {rows: [funcionarioRow]} = await pool.query(queryFuncionario, data);
 
         await pool.query('COMMIT');
 
         const createdData = {
-            ...funcionario,
-            id: funcionarioRow.id,
-            pessoa_id: pessoaRow.id,
-            imagem: imageUrl ? `https://ik.imagekit.io/bibliothek/PessoasImagens/${imageUrl}.png` : null,
-            situacao: 1
+            ...funcionarioRow,
+            ...pessoaRow
         }
 
-        console.log(createdData)
+        const {senha, ...formatedFuncionario} = createdData;
 
-        sendEmails(funcionario.usuario, funcionario.email, tempPassword);
+        console.log(formatedFuncionario)
+
+        //sendEmails(funcionario.usuario, funcionario.email, tempPassword);
  
-        reply.status(200).send({ message: 'Funcionario inserted successfully!', data:  createdData});
-    }catch(err){
+        reply.status(200).send({ message: 'Funcionario inserted successfully!', data:  formatedFuncionario});
+    }catch(err : any){
         console.log(err)
-        imageUrl && await deleteImage(imageUrl)
-        reply.status(500).send({ message: 'Funcionario not inserted!', data: err });
+        imageUrl && await deleteImages([imageUrl])
+        reply.status(500).send({ message: 'Funcionario not inserted!', data: err, errorMessage: err?.message });
     }
 };
 
 export const putFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
     const token = request.cookies.token;
-    console.clear()
 
     const { funcionario: funcionarioField, image } = request.body as { funcionario: { value: string }, image?: MultipartFile };
     const funcionario = JSON.parse(funcionarioField.value);
+
+    console.log(funcionario)
 
     try{
 
@@ -131,44 +109,44 @@ export const putFuncionario = async (request: FastifyRequest, reply: FastifyRepl
 
         let imagemUrl = null;
         let imageID = null;
-        const queryImagem = 'SELECT IMAGEM FROM PESSOA WHERE ID = $1 LIMIT 1';
-        const { rows: [imagemBDId] } = await pool.query(queryImagem, [funcionario.pessoa_id]);
+        const queryImagem = 'SELECT IMAGEM FROM PESSOA WHERE CODIGOPESSOA = $1 LIMIT 1';
+        const { rows: [imagemBDId] } = await pool.query(queryImagem, [funcionario.codigopessoa]);
 
         if(image){ // Imagem foi enviada
-            if (imagemBDId.imagem) await deleteImage(imagemBDId.imagem);
+            if (imagemBDId.imagem) await deleteImages([imagemBDId.imagem]);
 
             // Envio nova imagem
             imageID = await processAndUploadImage(image, '/PessoasImagens');
 
             // Crio URL com a nova imagem
-            imagemUrl = `https://ik.imagekit.io/bibliothek/PessoasImagens/${imageID}.png`
+            imagemUrl = imageID
 
         }else{ // Imagem não foi enviada
             if(funcionario.imageChanged == 2) { // Imagem prévia removida
                 // Remove imagem do banco e deleta do ImageKit
                 if(imagemBDId.imagem){ // tem imagem no banco
-                    const queryImagem = 'UPDATE PESSOA SET IMAGEM = $1 WHERE ID = $2';
-                    await pool.query(queryImagem, [null, funcionario.id]);
-                    await deleteImage(imagemBDId.imagem);
+                    const queryImagem = 'UPDATE PESSOA SET IMAGEM = $1 WHERE CODIGOPESSOA = $2';
+                    await pool.query(queryImagem, [null, funcionario.codigopessoa]);
+                    await deleteImages([imagemBDId.imagem]);
                 }
             }else{ // Não alterou a imagem prévia
-                imagemUrl = imagemBDId.imagem ? `https://ik.imagekit.io/bibliothek/PessoasImagens/${imagemBDId.imagem}.png` : null;
+                imagemUrl = imagemBDId.imagem ? imagemBDId.imagem : null;
             }
         }
 
         await pool.query('BEGIN');
-        const queryPessoa = "UPDATE PESSOA SET NOME = $1, CONTATO = $2, IMAGEM = COALESCE($3, IMAGEM), OBSERVACAO = $4, SITUACAO = $5 WHERE ID = $6";
-        const data = [funcionario.nome, funcionario.contato, imageID, funcionario.observacao, funcionario.situacao, funcionario.pessoa_id];
+        const queryPessoa = "UPDATE PESSOA SET NOME = $1, CONTATO = $2, IMAGEM = COALESCE($3, IMAGEM), OBSERVACAO = $4, SITUACAO = $5 WHERE CODIGOPESSOA = $6";
+        const data = [funcionario.nome, funcionario.contato, imageID, funcionario.observacao, funcionario.situacao, funcionario.codigopessoa];
         await pool.query(queryPessoa, data);
 
         const queryFuncionario = `UPDATE FUNCIONARIO 
-                                    SET USUARIO = $1,
-                                        EMAIL = $2,
-                                        PRIVILEGIO = $3,
-                                        DATAADMISSAO = $4
-                                    WHERE ID = $5
+                                    SET 
+                                        EMAIL = $1,
+                                        PRIVILEGIO = $2,
+                                        DATAADMISSAO = $3
+                                    WHERE CODIGOFUNCIONARIO = $4
                             `;
-        const dataFuncionario = [funcionario.usuario, funcionario.email, funcionario.privilegio, funcionario.dataadmissao, funcionario.id];
+        const dataFuncionario = [funcionario.email, funcionario.privilegio, funcionario.dataadmissao, funcionario.codigofuncionario];
         await pool.query(queryFuncionario, dataFuncionario);
 
         const updatedFuncionario = {
@@ -181,9 +159,9 @@ export const putFuncionario = async (request: FastifyRequest, reply: FastifyRepl
         await pool.query('COMMIT');
 
         reply.status(200).send({ message: 'Funcionario updated successfully!', data:  updatedFuncionario});
-    }catch(err){
+    }catch(err : any){
         console.log(err)
-        reply.status(500).send({ message: 'Funcionario not updated!', data: err });
+        reply.status(500).send({ message: 'Funcionario not updated!', data: err, errorMessage: err?.message });
     }
 };
 
@@ -201,31 +179,30 @@ export const resetSenhaFuncionario = async (request: FastifyRequest, reply: Fast
 
         const queryFuncionario = `UPDATE FUNCIONARIO 
                                     SET SENHA = $1
-                                    WHERE EMAIL = $2 RETURNING *
+                                    WHERE EMAIL = $2 AND CODIGOFUNCIONARIO = $3 RETURNING *
                             `;
-        const dataFuncionario = [hashedPassword, funcionario.email];
+        const dataFuncionario = [hashedPassword, funcionario.email, funcionario.codigofuncionario];
         const {rows: [funcionarioRow]} = await pool.query(queryFuncionario, dataFuncionario);
         
-        console.log(funcionarioRow, funcionarioRow.usuario)
-        await sendEmails(funcionarioRow.usuario, funcionarioRow.email, tempPassword);
+        await sendEmails(funcionarioRow.usuario, funcionarioRow.email, tempPassword, funcionarioRow.usuario);
 
         reply.status(200).send({ message: 'Funcionario updated successfully!', data:  funcionario});
         await pool.query('COMMIT');
-    }catch(err){
+    }catch(err : any){
         console.log(err)
         await pool.query('ROLLBACK');
-        reply.status(500).send({ message: 'Funcionario not updated!', data: err });
+        reply.status(500).send({ message: 'Funcionario not updated!', data: err, errorMessage: err?.message });
     }
 };
 
 export const deleteFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { pessoaID } = request.query as {pessoaID : number};
+    const { codigopessoa } = request.query as {codigopessoa : number};
     const token = request.cookies.token;
 
-    console.log(pessoaID)
+    console.log(codigopessoa)
 
     try{
-        if(!pessoaID){
+        if(!codigopessoa){
             return reply.status(400).send({ message: "Funcionario's ID required!" })
         }
 
@@ -241,7 +218,7 @@ export const deleteFuncionario = async (request: FastifyRequest, reply: FastifyR
 
         await pool.query('BEGIN');
 
-        const data = [pessoaID];
+        const data = [codigopessoa];
 
         const queryImagem = 'SELECT IMAGEM FROM PESSOA WHERE ID = $1 LIMIT 1';
         const { rows: [imagemId] } = await pool.query(queryImagem, data);
@@ -252,12 +229,12 @@ export const deleteFuncionario = async (request: FastifyRequest, reply: FastifyR
         await pool.query(queryFuncionario, data);
         await pool.query(queryPessoa, data);
 
-        imagemId.imagem && await deleteImage(imagemId.imagem)
+        imagemId.imagem && await deleteImages([imagemId.imagem])
 
         await pool.query('COMMIT');
 
-        reply.status(200).send({ message: 'Funcionario deleted successfully!', data:  rows[0]});
-    }catch(err){
-        reply.status(200).send({ message: 'Funcionario not deleted!', data: err });
+        reply.status(200).send({ message: 'Funcionario deleted successfully!', data:  codigopessoa});
+    }catch(err : any){
+        reply.status(200).send({ message: 'Funcionario not deleted!', data: err, errorMessage: err?.message });
     }
 };

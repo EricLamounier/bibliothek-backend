@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const PORT = Number(process.env.PORT) || 3000;
-const HOST = '192.168.3.9'; // Permite acessar pelo IP da máquina na rede
+const HOST = '0.0.0.0' // Permite acessar pelo IP da máquina na rede
 // const HOST = '169.254.83.107'
 console.clear();
 
