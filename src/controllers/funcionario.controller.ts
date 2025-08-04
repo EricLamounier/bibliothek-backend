@@ -12,7 +12,7 @@ export const getFuncionario = async (request: FastifyRequest, reply: FastifyRepl
                     FUN.EMAIL,
                     FUN.DATAADMISSAO,
                     FUN.PRIVILEGIO	
-                FROM PESSOA PES JOIN FUNCIONARIO FUN ON PES.CODIGOPESSOA = FUN.CODIGOFUNCIONARIO
+                FROM PESSOA PES JOIN FUNCIONARIO FUN ON PES.CODIGOPESSOA = FUN.CODIGOPESSOA
                 WHERE PES.TIPOPESSOA = 2;
             `;
 
@@ -55,15 +55,15 @@ export const postFuncionario = async(request: FastifyRequest, reply: FastifyRepl
         const queryPessoa = `INSERT INTO PESSOA (NOME, CONTATO, OBSERVACAO, IMAGEM, TIPOPESSOA)
                             VALUES ($1, $2, $3, $4, $5) RETURNING *`;
         const {rows: [pessoaRow]} = await pool.query(queryPessoa, dataPessoa);
-
+        console.log(pessoaRow)
         // Pega senha temporaria
         const tempPassword = "000"//generateTempPassword()
         const hashedPassword = await hashPassword(tempPassword)
 
         console.log(tempPassword, hashedPassword)
 
-        const queryFuncionario = "INSERT INTO FUNCIONARIO (USUARIO, EMAIL, DATAADMISSAO, PRIVILEGIO, SENHA, CODIGOPESSOA) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *";
-        const data = [funcionario.usuario, funcionario.email, funcionario.dataadmissao, funcionario.privilegio, hashedPassword, pessoaRow.codigoPessoa]
+        const queryFuncionario = "INSERT INTO FUNCIONARIO (EMAIL, DATAADMISSAO, PRIVILEGIO, SENHA, CODIGOPESSOA) VALUES ($1, $2, $3, $4, $5) RETURNING *";
+        const data = [funcionario.email, funcionario.dataadmissao, funcionario.privilegio, hashedPassword, pessoaRow.codigopessoa]
         const {rows: [funcionarioRow]} = await pool.query(queryFuncionario, data);
 
         await pool.query('COMMIT');
@@ -75,9 +75,7 @@ export const postFuncionario = async(request: FastifyRequest, reply: FastifyRepl
 
         const {senha, ...formatedFuncionario} = createdData;
 
-        console.log(formatedFuncionario)
-
-        //sendEmails(funcionario.usuario, funcionario.email, tempPassword);
+        sendEmails(funcionario.nome, funcionario.email, tempPassword, undefined, "Seu acesso Bibliothek");
  
         reply.status(200).send({ message: 'Funcionario inserted successfully!', data:  formatedFuncionario});
     }catch(err : any){
@@ -220,11 +218,11 @@ export const deleteFuncionario = async (request: FastifyRequest, reply: FastifyR
 
         const data = [codigopessoa];
 
-        const queryImagem = 'SELECT IMAGEM FROM PESSOA WHERE ID = $1 LIMIT 1';
+        const queryImagem = 'SELECT IMAGEM FROM PESSOA WHERE CODIGOPESSOA = $1 LIMIT 1';
         const { rows: [imagemId] } = await pool.query(queryImagem, data);
 
-        const queryFuncionario = 'DELETE FROM FUNCIONARIO WHERE PESSOA_ID = $1';
-        const queryPessoa = 'DELETE FROM PESSOA WHERE ID = $1';
+        const queryFuncionario = 'DELETE FROM FUNCIONARIO WHERE CODIGOPESSOA = $1';
+        const queryPessoa = 'DELETE FROM PESSOA WHERE CODIGOPESSOA = $1';
         
         await pool.query(queryFuncionario, data);
         await pool.query(queryPessoa, data);
@@ -235,6 +233,7 @@ export const deleteFuncionario = async (request: FastifyRequest, reply: FastifyR
 
         reply.status(200).send({ message: 'Funcionario deleted successfully!', data:  codigopessoa});
     }catch(err : any){
+        await pool.query('ROLLBACK');
         reply.status(200).send({ message: 'Funcionario not deleted!', data: err, errorMessage: err?.message });
     }
 };

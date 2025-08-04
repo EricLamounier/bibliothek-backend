@@ -93,6 +93,8 @@ export const putProfessor = async (request: FastifyRequest, reply: FastifyReply)
     const { professor: professorField, image } = request.body as { professor: { value: string }, image?: MultipartFile };
     const professor = JSON.parse(professorField.value);
 
+    console.log(professor)
+
     try{
 
         if(!token){
@@ -108,7 +110,7 @@ export const putProfessor = async (request: FastifyRequest, reply: FastifyReply)
         let imagemUrl = null;
         let imageID = null;
         const queryImagem = 'SELECT IMAGEM FROM PESSOA WHERE CODIGOPESSOA = $1 LIMIT 1';
-        const { rows: [imagemBDId] } = await pool.query(queryImagem, [professor.pessoa_id]);
+        const { rows: [imagemBDId] } = await pool.query(queryImagem, [professor.codigopessoa]);
 
         if(image){ // Imagem foi enviada
             if (imagemBDId.imagem) await deleteImages([imagemBDId.imagem]);

@@ -24,6 +24,7 @@ export const getEmprestimo = async(request: FastifyRequest, reply: FastifyReply)
             SELECT 
                 EMP.*,
                 PES.*,
+                EMP.OBSERVACAO AS OBSERVACAO,
                 EMP.SITUACAO AS SITUACAO,
                 SUM(EL.QUANTIDADEDEVOLVIDA) AS totaldevolvido,
                 SUM(EL.QUANTIDADEEMPRESTADA)          AS totalemprestado,
@@ -75,6 +76,8 @@ export const getEmprestimo = async(request: FastifyRequest, reply: FastifyReply)
         
         query += ' GROUP BY EMP.CODIGOEMPRESTIMO, PES.CODIGOPESSOA, PES.NOME;';
         const {rows} = await pool.query(query, data);
+
+        console.log(rows)
 
         reply.status(200).send({ message: 'Emprestimo found successfully!', data:  rows});
     }catch(err){
@@ -135,7 +138,6 @@ export const postEmprestimo = async(request: FastifyRequest, reply: FastifyReply
     
 }
 
-
 export const devolveEmprestimo = async(request: FastifyRequest, reply: FastifyReply) => {
     const { emprestimo } = request.body 
     const token = request.cookies.token;    
@@ -153,8 +155,8 @@ export const devolveEmprestimo = async(request: FastifyRequest, reply: FastifyRe
 
     try{
         await pool.query('BEGIN');
-        const query = "UPDATE EMPRESTIMO SET DATADEVOLUCAO = $1 WHERE CODIGOEMPRESTIMO = $2 RETURNING *";
-        const data = [emprestimo.datadevolucao, emprestimo.codigoemprestimo]
+        const query = "UPDATE EMPRESTIMO SET DATADEVOLUCAO = $1, OBSERVACAO = $2 WHERE CODIGOEMPRESTIMO = $3 RETURNING *";
+        const data = [emprestimo.datadevolucao, emprestimo.observacao, emprestimo.codigoemprestimo]
         const {rows} = await pool.query(query, data);
 
         const livros = emprestimo.livros;
@@ -168,12 +170,6 @@ export const devolveEmprestimo = async(request: FastifyRequest, reply: FastifyRe
             const queryLivro = "UPDATE EMPRESTIMO_LIVRO SET QUANTIDADEDEVOLVIDA = QUANTIDADEDEVOLVIDA + $1 WHERE CODIGOEMPRESTIMO = $2 AND CODIGOLIVRO = $3 RETURNING *";
             const dataLivro = [livro.quantidade, emprestimo.codigoemprestimo, livro.codigolivro]        
             const {rows: emprestimoLivros} = await pool.query(queryLivro, dataLivro);
-            //console.log(emprestimoLivros)
-
-            if(thisLivro[0].quantidadedisponivel === 0 || thisLivro[0].quantidadedisponivel < livro.quantidade){
-                await pool.query('ROLLBACK');
-                return reply.status(400).send({ message: "Livro not available!" })
-            }
         }
         await pool.query('COMMIT');
         reply.status(200).send({ message: 'Emprestimo returned successfully!', data:  'sucess' });
@@ -202,8 +198,8 @@ export const renovaEmprestimo = async(request: FastifyRequest, reply: FastifyRep
 
     try{
         await pool.query('BEGIN');
-        const query = "UPDATE EMPRESTIMO SET DATADEVOLUCAOPREVISTA = $1 WHERE CODIGOEMPRESTIMO = $2 RETURNING *";
-        const data = [emprestimo.datadevolucaoprevista, emprestimo.codigoemprestimo]
+        const query = "UPDATE EMPRESTIMO SET DATADEVOLUCAOPREVISTA = $1, OBSERVACAO = $2 WHERE CODIGOEMPRESTIMO = $3 RETURNING *";
+        const data = [emprestimo.datadevolucaoprevista, emprestimo.observacao, emprestimo.codigoemprestimo]
         const {rows} = await pool.query(query, data);
 
         await pool.query('COMMIT');

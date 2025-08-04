@@ -45,7 +45,7 @@ export const getLivro = async (request: FastifyRequest, reply: FastifyReply) => 
             };
         }));
 
-        console.log(livrosComAutores)
+        //console.log(livrosComAutores)
 
         reply.status(200).send({ 
             message: 'Livros fetched successfully!', 

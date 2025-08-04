@@ -24,18 +24,67 @@ export async function renameImage(filePath: string, newFileName: string, folder 
   }
 }
 
+async function compressImage(buffer: Buffer, targetSizeKB: number): Promise<Buffer> {
+  let quality = 80; // Qualidade inicial
+  let result = await sharp(buffer)
+    .png({ quality })
+    .toBuffer();
+  
+  // Se a imagem já estiver menor que o tamanho alvo, retorna
+  if (result.length <= targetSizeKB * 1024) {
+    return result;
+  }
+
+  // Reduz a qualidade até atingir o tamanho desejado
+  while (result.length > targetSizeKB * 1024 && quality > 10) {
+    quality -= 5;
+    result = await sharp(buffer)
+      .png({ 
+        quality,
+        compressionLevel: 9, // Máxima compressão
+        adaptiveFiltering: true,
+        force: true
+      })
+      .toBuffer();
+  }
+
+  // Se ainda estiver muito grande, redimensiona a imagem mantendo a proporção
+  if (result.length > targetSizeKB * 1024) {
+    const metadata = await sharp(result).metadata();
+    const scale = Math.sqrt((targetSizeKB * 1024) / result.length) * 0.9; // 90% do tamanho calculado para garantir
+    const newWidth = Math.round((metadata.width || 1000) * scale);
+    
+    result = await sharp(result)
+      .resize(newWidth, null, { 
+        fit: 'inside',
+        withoutEnlargement: true 
+      })
+      .png({ 
+        quality: Math.max(quality, 20), // Garante uma qualidade mínima
+        compressionLevel: 9
+      })
+      .toBuffer();
+  }
+
+  return result;
+}
+
 export async function uploadImage(buffer: Buffer, filename: string, folder: string): Promise<string> {
   console.log('[ImageKit] Enviando imagem:', filename);
-  const pngBuffer = await sharp(buffer)
-  .png()
-  .toBuffer();
+  
+  // Comprime a imagem para no máximo 10KB
+  const maxSizeKB = 20;
+  const compressedBuffer = await compressImage(buffer, maxSizeKB);
+  
+  console.log(`[ImageKit] Tamanho original: ${(buffer.length / 1024).toFixed(2)}KB, ` +
+              `Comprimido: ${(compressedBuffer.length / 1024).toFixed(2)}KB`);
 
-  const tempFileName = `${Date.now()}_${filename}.png`
+  const tempFileName = `${Date.now()}_${filename}.png`;
 
   const result = await imagekit.upload({
-    file: pngBuffer,
+    file: compressedBuffer,
     fileName: tempFileName,
-    folder: folder, // Cria automaticamente se não existir
+    folder: folder,
   });
 
   const newName = await renameImage(result.filePath, result.fileId, folder);

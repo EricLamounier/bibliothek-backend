@@ -10,6 +10,7 @@ dotenv.config();
 export const authLogin = async (request: FastifyRequest, reply: FastifyReply) => {
     try{
         const { email, password } = request.body as { email: string; password: string };
+        console.log(email, password)
 
         const { rows } = await pool.query("SELECT FUN.*, PES.SITUACAO FROM FUNCIONARIO FUN JOIN PESSOA PES ON FUN.CODIGOPESSOA = PES.CODIGOPESSOA WHERE EMAIL = $1 LIMIT 1", [email]);
 
@@ -57,12 +58,17 @@ export const authJWT = async(request: FastifyRequest, reply: FastifyReply) => {
             FROM PESSOA PES JOIN FUNCIONARIO FUN ON PES.CODIGOPESSOA = FUN.CODIGOPESSOA
             WHERE PES.TIPOPESSOA = 2 AND FUN.CODIGOFUNCIONARIO = $1 LIMIT 1
         `
-        const data = [resp.funcionarioID]
-        const result = await pool.query(query, data)
+        const data = resp.funcionarioID
+        const result = await pool.query(query, [data])
         const funcionario = result.rows[0]
+
+        console.log('o')
+        console.log(result.rows)
+        console.log('o')
 
         const { senha, ...funcionarioFormated } = funcionario;
 
+        
         reply.status(200).send({ message: 'Logged successfully!', data: funcionarioFormated });
     }else{
         reply.status(401).send({ message: 'Invalid JWT Token!' });

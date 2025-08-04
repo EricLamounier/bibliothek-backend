@@ -31,15 +31,15 @@ export const generateCode = (length = 6) => {
 
 const sleep = (ms=5000) => new Promise(resolve => setTimeout(resolve, ms));
 
-export const sendEmails = async(username: any, email: any, code: string, text: string | undefined, subject="Seu acesso Bibliothek") => {
+export const sendEmails = async(name: any, email: any, code: string, text: string | undefined, subject="Seu acesso Bibliothek") => {
 	if(!text){
-		text = `Hey, ${username}! Aqui está sua senha de acesso temporária. Não compartilhe com ninguém, ok?`;
+		text = `Hey, ${name}! Aqui está sua senha de acesso temporária. Não compartilhe com ninguém, ok?`;
 	}
 
     const emails = [
         {
             email: email,
-            username: username,
+            name: name,
             verificationCode: code
         },
     ]
@@ -47,7 +47,7 @@ export const sendEmails = async(username: any, email: any, code: string, text: s
 	for(const email of emails){
 		const recipientData = {
 			verificationCode: email.verificationCode,
-			username: email.username,
+			name: email.name,
 		};
 
 		const renderedHtml = renderTemplate(emailTemplate, recipientData, text);
