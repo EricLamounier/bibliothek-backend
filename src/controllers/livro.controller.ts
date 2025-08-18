@@ -4,34 +4,80 @@ import { verifyJWT } from '../utils/jwt';
 import { deleteImages, processAndUploadImage } from '../utils/imagekit';
 import { MultipartFile } from '@fastify/multipart';
 
-interface LivroProps {
-    codigolivro?: number;
-    titulo: string;
-    autores: {codigoautor: number, sync: number}[];
-    editora: string;
-    edicao: string;
-    isbn: string;
-    genero: string;
-    dataPublicacao: string;
-    quantidadetotal: number;
-    quantidadedisponivel: number;
-    localizacao: string;
-    observacao: string;
-    situacao: number;
-    editora_id: number;
-};
-
 export const getLivro = async (request: FastifyRequest, reply: FastifyReply) => {
+    const { codigolivro, autor, editora, disponibilidade, situacao } = request.query as { codigolivro?: number[], autor?: number[], editora?: number[], disponibilidade?: number[], situacao?: number[] };
+    
+    console.log(disponibilidade)
     try {
         // First get all books
-        const queryLivros = `
-            SELECT l.*
+        let queryLivros = `
+            SELECT DISTINCT l.*
             FROM LIVRO l
         `;
-        const { rows: livros } = await pool.query(queryLivros);
+        
+        // Add JOIN for author filter if needed
+        if (autor) {
+            queryLivros += `
+                JOIN LIVRO_AUTOR LA ON l.CODIGOLIVRO = LA.CODIGOLIVRO
+            `;
+        }
+
+        const params: any[] = [];
+        const conditions: string[] = [];
+        let paramIndex = 1;
+
+        if (codigolivro) {
+            const livros = Array.isArray(codigolivro) ? codigolivro : [codigolivro]
+            const placeholders = livros.map((_, i) => `$${paramIndex + i}`)
+            conditions.push(`l.CODIGOLIVRO IN (${placeholders.join(',')})`)
+            params.push(...livros)
+            paramIndex += livros.length
+        }
+
+        if (autor) {
+            const autores = Array.isArray(autor) ? autor : [autor]
+            const placeholders = autores.map((_, i) => `$${paramIndex + i}`)
+            conditions.push(`LA.CODIGOAUTOR IN (${placeholders.join(',')})`)
+            params.push(...autores)
+            paramIndex += autores.length
+        }
+
+        if (editora) {
+            const editoras = Array.isArray(editora) ? editora : [editora]
+            const placeholders = editoras.map((_, i) => `$${paramIndex + i}`)
+            conditions.push(`l.CODIGOEDITORA IN (${placeholders.join(',')})`)
+            params.push(...editoras)
+            paramIndex += editoras.length
+        }
+
+        if (situacao) {
+            const situacoes = Array.isArray(situacao) ? situacao : [situacao]
+            const placeholders = situacoes.map((_, i) => `$${paramIndex + i}`)
+            conditions.push(`l.SITUACAO IN (${placeholders.join(',')})`)
+            params.push(...situacoes)
+            paramIndex += situacoes.length
+        }
+
+        if (disponibilidade) {
+            const disponiveis = Array.isArray(disponibilidade) ? disponibilidade : [disponibilidade]
+            if(disponibilidade.length == 1){               
+                if(disponiveis.includes('1')){
+                    conditions.push(`l.QUANTIDADEDISPONIVEL > 0`)
+                }else if(disponiveis.includes('0')){
+                    conditions.push(`l.QUANTIDADEDISPONIVEL <= 0`)
+                }
+            }
+        }
+
+        if (conditions.length > 0) {
+            queryLivros += ' WHERE ' + conditions.join(' AND ');
+        }
+
+        console.log(queryLivros, params)
+        const { rows: livros } = await pool.query(queryLivros, params);
 
         // For each book, get its authors
-        const livrosComAutores = await Promise.all(livros.map(async (livro) => {
+        const livrosComAutores = await Promise.all(livros.map(async (livro : any) => {
             const queryAutores = `
                 SELECT LA.*, A.NOME
                 FROM LIVRO_AUTOR LA JOIN AUTOR A ON A.CODIGOAUTOR = LA.CODIGOAUTOR
@@ -41,11 +87,9 @@ export const getLivro = async (request: FastifyRequest, reply: FastifyReply) => 
             
             return {
                 ...livro,
-                autores: autores.map(autor => ({ codigoautor: autor.codigoautor, nome: autor.nome, sync: 0 })),
+                autores: autores.map((autor : any) => ({ codigoautor: autor.codigoautor, nome: autor.nome, sync: 0 })),
             };
         }));
-
-        //console.log(livrosComAutores)
 
         reply.status(200).send({ 
             message: 'Livros fetched successfully!', 
@@ -64,8 +108,6 @@ export const postLivro = async(request: FastifyRequest, reply: FastifyReply) => 
 
     const { livro: livroField, image } = request.body as { livro: { value: string }, image?: MultipartFile };
     const token = request.cookies.token;
-
-    console.log(livroField)
 
     const livro = JSON.parse(livroField.value);
     let imageUrl = null
@@ -155,8 +197,6 @@ export const postLivro = async(request: FastifyRequest, reply: FastifyReply) => 
             imagem: imageUrl
         };
 
-        console.log(responseData)
-
         await pool.query('COMMIT');
         reply.status(200).send({ message: 'Livro inserted successfully!', data: responseData });
 
@@ -173,8 +213,6 @@ export const putLivro = async (request: FastifyRequest, reply: FastifyReply) => 
     const token = request.cookies.token;
 
     const livro = JSON.parse(livroField.value);
-    console.log(livro)
-
     try{
         if(!livro){
             return reply.status(400).send({ message: "Livro's ID required!" });
@@ -284,7 +322,6 @@ export const putLivro = async (request: FastifyRequest, reply: FastifyReply) => 
             imagem: imagemUrl
         }
 
-        console.log(updatedLivro)
         await pool.query('COMMIT');
         
         reply.status(200).send({ message: 'Livro updated successfully!', data:  updatedLivro});

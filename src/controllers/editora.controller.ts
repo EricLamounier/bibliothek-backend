@@ -4,13 +4,8 @@ import { verifyJWT } from '../utils/jwt';
 import { capitalizarTexto } from '../utils/utils';
 
 export const postEditora = async(request: FastifyRequest, reply: FastifyReply) => {
-    
     const { nome, observacao } = request.body as {nome : string, observacao ?: string};
     const token = request.cookies.token;
-
-    console.log(nome, observacao);
-
-    console.log(token)
 
     try{
         if (!nome) {
@@ -40,12 +35,45 @@ export const postEditora = async(request: FastifyRequest, reply: FastifyReply) =
 };
 
 export const getEditora = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { nome, situacao } = request.query as { nome?: string; situacao?: number[] }
-    const query = `SELECT * FROM EDITORA`;
-    const { rows } = await pool.query(query);
+    const { editora, situacao } = request.query as { editora?: string | string[], situacao?: number | number[] }
+    console.log(editora, situacao)
+    let query = `
+      SELECT * 
+      FROM EDITORA
+    `
+    const conditions: string[] = []
+    const values: any[] = []
+    let paramIndex = 1
+    
+    if (situacao) {
+      const situacoes = Array.isArray(situacao) ? situacao : [situacao]
+      const placeholders = situacoes.map((_, i) => `$${paramIndex + i}`)
+      conditions.push(`SITUACAO IN (${placeholders.join(',')})`)
+      values.push(...situacoes.map(Number))
+      paramIndex += situacoes.length
+    }
 
-    reply.status(200).send({ message: 'Editoras fetched successfully!', data: rows });
-};
+    console.log(editora)
+  
+    if (editora) {
+      const editoras = Array.isArray(editora) ? editora : [editora]
+      const placeholders = editoras.map((_, i) => `$${paramIndex + i}`)
+      conditions.push(`CODIGOEDITORA IN (${placeholders.join(',')})`)
+      values.push(...editoras)
+      paramIndex += editoras.length
+    }
+  
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ')
+    }
+  
+    query += ' GROUP BY CODIGOEDITORA, NOME, OBSERVACAO, SITUACAO'
+  
+    const { rows } = await pool.query(query, values)
+    console.log(query)
+    reply.status(200).send({ message: 'Editoras fetched successfully!', data: rows })
+  }
+  
 
 export const deleteEditora = async (request: FastifyRequest, reply: FastifyReply) => {
     const { codigoeditora } = request.query as {codigoeditora : number};
@@ -84,8 +112,6 @@ export const putEditora = async (request: FastifyRequest, reply: FastifyReply) =
     const { codigoeditora, nome, observacao, situacao } = request.body as {codigoeditora : number, nome: string, observacao : string, situacao : number};
     const token = request.cookies.token;
 
-    console.log(codigoeditora, nome, observacao, situacao)
-
     try{
         if(codigoeditora === undefined){
             return reply.status(400).send({ message: "Editora's ID required!" });
@@ -106,7 +132,6 @@ export const putEditora = async (request: FastifyRequest, reply: FastifyReply) =
         const query = 'UPDATE EDITORA SET NOME = $1, OBSERVACAO = $2, SITUACAO = $3 WHERE CODIGOEDITORA = $4 RETURNING *';
         const { rows } = await pool.query(query, data);
         await pool.query('COMMIT');
-        console.log('e')
         reply.status(200).send({ message: 'Editora updated successfully!', data:  rows[0]});
 
     }catch(err){

@@ -41,13 +41,42 @@ export const postAutor = async(request: FastifyRequest, reply: FastifyReply) => 
 };
 
 export const getAutor = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { nome, situacao } = request.query as { nome?: string; situacao?: number[] }
-    const query = `SELECT * FROM AUTOR`;
-    const { rows } = await pool.query(query);
-
-    reply.status(200).send({ message: 'Autors fetched successfully!', data: rows });
-};
-
+    const { autor, situacao } = request.query as { autor?: string | string[], situacao?: number | number[] }
+  
+    let query = `SELECT * FROM AUTOR`
+    const conditions: string[] = []
+    const values: any[] = []
+    let paramIndex = 1
+  
+    if (autor) {
+      const autores = Array.isArray(autor) ? autor : [autor]
+      const placeholders = autores.map((_, i) => `$${paramIndex + i}`)
+      conditions.push(`CODIGOAUTOR IN (${placeholders.join(',')})`)
+      values.push(...autores)
+      paramIndex += autores.length
+    }
+  
+    if (situacao) {
+      const situacoes = Array.isArray(situacao) ? situacao : [situacao]
+      const placeholders = situacoes.map((_, i) => `$${paramIndex + i}`)
+      conditions.push(`SITUACAO IN (${placeholders.join(',')})`)
+      values.push(...situacoes.map(Number))
+      paramIndex += situacoes.length
+    }
+  
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ')
+    }
+  
+    query += ' GROUP BY CODIGOAUTOR, NOME, OBSERVACAO, SITUACAO'
+  
+    console.log(query, values)
+  
+    const { rows } = await pool.query(query, values)
+  
+    reply.status(200).send({ message: 'Autores fetched successfully!', data: rows })
+  }
+  
 export const deleteAutor = async (request: FastifyRequest, reply: FastifyReply) => {
     const { codigoautor } = request.query as {codigoautor : number};
     const token = request.cookies.token;

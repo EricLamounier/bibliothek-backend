@@ -7,10 +7,6 @@ export const postDisciplina = async(request: FastifyRequest, reply: FastifyReply
     const { nome, observacao } = request.body as {nome : string, observacao ?: string};
     const token = request.cookies.token;
 
-    console.log(nome, observacao);
-
-    console.log(token)
-
     try{
         if (!nome) {
             return reply.status(400).send({ message: "Disciplina's name required!" });
@@ -39,24 +35,53 @@ export const postDisciplina = async(request: FastifyRequest, reply: FastifyReply
 };
 
 export const getDisciplina = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { nome, situacao } = request.query as { nome?: string; situacao?: number[] }
-    const query = `SELECT * FROM DISCIPLINA`;
-    const { rows } = await pool.query(query);
+    const { disciplina, situacao } = request.query as { disciplina?: string | string[], situacao?: string | string[] }
+  
+    console.log(disciplina, situacao)
+    let query = `
+      SELECT * 
+      FROM DISCIPLINA
+    `
+    const conditions: string[] = []
+    const values: any[] = []
+    let paramIndex = 1
+  
+    // filtro por situação
+    if (situacao) {
+      const situacoes = Array.isArray(situacao) ? situacao : [situacao]
+      const placeholders = situacoes.map((_, i) => `$${paramIndex + i}`)
+      conditions.push(`SITUACAO IN (${placeholders.join(',')})`)
+      values.push(...situacoes.map(Number)) // garante que seja número
+      paramIndex += situacoes.length
+    }
 
-    //console.log(rows)
-
-    reply.status(200).send({ message: 'Disciplinas fetched successfully!', data: rows });
-};
+    if (disciplina) {
+      const disciplinas = Array.isArray(disciplina) ? disciplina : [disciplina]
+      const placeholders = disciplinas.map((_, i) => `$${paramIndex + i}`)
+      conditions.push(`CODIGODISCIPLINA IN (${placeholders.join(',')})`)
+      console.log(disciplinas)
+      values.push(...disciplinas)
+      paramIndex += disciplinas.length
+    }
+  
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ')
+    }
+  
+    query += ' GROUP BY CODIGODISCIPLINA, NOME, OBSERVACAO, SITUACAO'
+    console.log(query, values)
+  
+    const { rows } = await pool.query(query, values)
+    reply.status(200).send({ message: 'Disciplinas fetched successfully!', data: rows })
+  }  
 
 export const deleteDisciplina = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { codigodisciplina } = request.body as {codigodisciplina : number[]};
+    const { disciplinas } = request.body as {disciplinas : any[]};
     const token = request.cookies.token;
 
-    console.log(request.body)
-
     try{
-        if(!codigodisciplina){
-            return reply.status(400).send({ message: "Disciplina's ID required!" })
+        if(!disciplinas){
+            return reply.status(400).send({ message: "Disciplinas required!" })
         }
 
         if(!token){
@@ -70,7 +95,7 @@ export const deleteDisciplina = async (request: FastifyRequest, reply: FastifyRe
         }
 
         await pool.query('BEGIN');
-        const ids = codigodisciplina.map(d => d);
+        const ids = disciplinas.map(d => d.codigodisciplina);
         const placeholders = ids.map((_, index) => `$${index + 1}`).join(", ");
         const query = `DELETE FROM DISCIPLINA WHERE CODIGODISCIPLINA IN (${placeholders})`;
         await pool.query(query, ids);
@@ -87,8 +112,6 @@ export const deleteDisciplina = async (request: FastifyRequest, reply: FastifyRe
 export const putDisciplina = async (request: FastifyRequest, reply: FastifyReply) => {
     const { codigodisciplina, nome, observacao, situacao } = request.body as {codigodisciplina : number, nome: string, observacao : string, situacao : number};
     const token = request.cookies.token;
-
-    console.log(request.body)
 
     try{
         if(!codigodisciplina){

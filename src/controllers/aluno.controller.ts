@@ -4,26 +4,124 @@ import { verifyJWT } from '../utils/jwt';
 import { deleteImages, processAndUploadImage } from '../utils/imagekit';
 import { MultipartFile } from '@fastify/multipart';
 
-interface AlunoProps {
-    userID: number | string;
-    nome: string;
-    observacao?: string;
-};
-
 export const getAluno = async (request: FastifyRequest, reply: FastifyReply) => {
-    const query = `SELECT
-                    PES.*,
-                    AL.*
-                    FROM PESSOA PES
-                    JOIN ALUNO AL ON PES.CODIGOPESSOA = AL.CODIGOPESSOA
-                    WHERE PES.TIPOPESSOA = 0
-                    GROUP BY PES.CODIGOPESSOA, PES.NOME, PES.CONTATO, AL.CODIGOALUNO;
-                    `;
+    const { aluno, situacao } = request.query as { aluno?: number, situacao?: string };
+    console.log(aluno, situacao)
+    let query = `
+        SELECT
+            PES.*,
+            AL.*
+        FROM PESSOA PES
+        JOIN ALUNO AL ON PES.CODIGOPESSOA = AL.CODIGOPESSOA
+    `;
+    const conditions: string[] = []
+    const values: any[] = []
+    let paramIndex = 1
 
-    const { rows : alunos } = await pool.query(query);
-    console.log(alunos)
-    reply.status(200).send({ message: 'Alunos fetched successfully!', data: alunos });
+    if (aluno) {
+        const alunos = Array.isArray(aluno) ? aluno : [aluno]
+        const placeholders = alunos.map((_, i) => `$${paramIndex + i}`)
+        conditions.push(`AL.CODIGOALUNO IN (${placeholders.join(',')})`)
+        values.push(...alunos)
+        paramIndex += alunos.length
+    }
+
+    if (situacao) {
+        const situacoes = Array.isArray(situacao) ? situacao : [situacao]
+        const placeholders = situacoes.map((_, i) => `$${paramIndex + i}`)
+        conditions.push(`SITUACAO IN (${placeholders.join(',')})`)
+        values.push(...situacoes.map(Number))
+        paramIndex += situacoes.length
+    }
+
+    if (conditions.length > 0) {
+        query += ' WHERE ' + conditions.join(' AND ') + ' AND PES.TIPOPESSOA = 0'
+    } else {
+        query += ' WHERE PES.TIPOPESSOA = 0'
+    }
+
+    query += `
+        GROUP BY PES.CODIGOPESSOA, PES.NOME, PES.CONTATO, AL.CODIGOALUNO
+    `;
+
+    const { rows: alunos } = await pool.query(query, values);
+
+    reply.status(200).send({
+        message: 'Alunos fetched successfully!',
+        data: alunos
+    });
 };
+
+export const getProfessor222 = async (request: FastifyRequest, reply: FastifyReply) => {
+    const { codigoprofessor, situacao, disciplina } = request.query as { codigoprofessor?: number | number[], situacao?: number | number[], disciplina?: number | number[] }
+  
+    let query = `
+      SELECT 
+        PROF.*,
+        PES.*,
+        COALESCE(
+          JSON_AGG(DISTINCT to_jsonb(D)) FILTER (WHERE D.CODIGODISCIPLINA IS NOT NULL),
+          '[]'
+        ) AS disciplinas
+      FROM PESSOA PES
+      JOIN PROFESSOR PROF ON PES.CODIGOPESSOA = PROF.CODIGOPESSOA
+      LEFT JOIN PROFESSOR_DISCIPLINA PD ON PROF.CODIGOPROFESSOR = PD.CODIGOPROFESSOR
+      LEFT JOIN DISCIPLINA D ON PD.CODIGODISCIPLINA = D.CODIGODISCIPLINA
+    `
+    const conditions: string[] = []
+    const values: any[] = []
+    let paramIndex = 1
+
+    if (codigoprofessor) {
+      const codigos = Array.isArray(codigoprofessor) ? codigoprofessor : [codigoprofessor]
+      const placeholders = codigos.map((_, i) => `$${paramIndex + i}`)
+      conditions.push(`PROF.CODIGOPROFESSOR IN (${placeholders.join(',')})`)
+      values.push(...codigos)
+      paramIndex += codigos.length
+    }
+  
+    // filtro por situação
+    if (situacao) {
+      const situacoes = Array.isArray(situacao) ? situacao : [situacao]
+      const placeholders = situacoes.map((_, i) => `$${paramIndex + i}`)
+      conditions.push(`PES.SITUACAO IN (${placeholders.join(',')})`)
+      values.push(...situacoes.map(Number))
+      paramIndex += situacoes.length
+    }
+  
+    // filtro por disciplina
+    if (disciplina) {
+
+      const disciplinas = Array.isArray(disciplina) ? disciplina : [disciplina]
+      console.log(disciplinas)
+      const placeholders = disciplinas.map((_, i) => `$${paramIndex + i}`)
+      conditions.push(`D.CODIGODISCIPLINA IN (${placeholders.join(',')})`)
+      values.push(...disciplinas)
+      paramIndex += disciplinas.length
+    }
+  
+    // monta WHERE com TIPOPESSOA fixo
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ') + ' AND PES.TIPOPESSOA = 1'
+    } else {
+      query += ' WHERE PES.TIPOPESSOA = 1'
+    }
+  
+    query += `
+      GROUP BY 
+        PES.CODIGOPESSOA, 
+        PES.NOME, 
+        PES.CONTATO, 
+        PROF.CODIGOPROFESSOR
+    `
+  
+    console.log(codigoprofessor, situacao, disciplina) // debug seguro
+  
+    const { rows } = await pool.query(query, values)
+    console.log(rows)
+  
+    reply.status(200).send({ message: 'Professors fetched successfully!', data: rows })
+}
 
 export const postAluno = async(request: FastifyRequest, reply: FastifyReply) => {
     
@@ -31,7 +129,6 @@ export const postAluno = async(request: FastifyRequest, reply: FastifyReply) => 
 
     const { aluno: alunoField, image } = request.body as { aluno: { value: string }, image?: MultipartFile };
     const aluno = JSON.parse(alunoField.value); 
-    console.log(aluno)  
 
     let imageUrl = null
     try{
@@ -71,8 +168,6 @@ export const postAluno = async(request: FastifyRequest, reply: FastifyReply) => 
             ...pessoaRow,
             ...alunoRow
         }
-
-        console.log(createdData)
  
         reply.status(200).send({ message: 'Aluno inserted successfully!', data:  createdData});
     }catch(err : any){
@@ -87,8 +182,6 @@ export const putAluno = async (request: FastifyRequest, reply: FastifyReply) => 
 
     const { aluno: alunoField, image } = request.body as { aluno: { value: string }, image?: MultipartFile };
     const aluno = JSON.parse(alunoField.value);
-
-    console.log(aluno)
 
     try{
 

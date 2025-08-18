@@ -6,17 +6,57 @@ import { deleteImages, processAndUploadImage } from '../utils/imagekit';
 import { MultipartFile } from '@fastify/multipart';
 
 export const getFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
-    const query = `SELECT 
+    const { funcionario, privilegio, situacao } = request.query as { funcionario?: number, privilegio?: string, situacao?: string };
+    console.log(funcionario, privilegio, situacao)
+    let query = `SELECT 
                     PES.*,
                     FUN.CODIGOFUNCIONARIO,
                     FUN.EMAIL,
                     FUN.DATAADMISSAO,
                     FUN.PRIVILEGIO	
                 FROM PESSOA PES JOIN FUNCIONARIO FUN ON PES.CODIGOPESSOA = FUN.CODIGOPESSOA
-                WHERE PES.TIPOPESSOA = 2;
             `;
+    const conditions: string[] = []
+    const values: any[] = []
+    let paramIndex = 1
 
-    const { rows : funcionarios } = await pool.query(query);
+    if (funcionario) {
+        const funcionarios = Array.isArray(funcionario) ? funcionario : [funcionario]
+        const placeholders = funcionarios.map((_, i) => `$${paramIndex + i}`)
+        conditions.push(`FUN.CODIGOFUNCIONARIO IN (${placeholders.join(',')})`)
+        values.push(...funcionarios)
+        paramIndex += funcionarios.length
+    }
+
+    if (privilegio) {
+        const privilegios = Array.isArray(privilegio) ? privilegio : [privilegio]
+        const placeholders = privilegios.map((_, i) => `$${paramIndex + i}`)
+        conditions.push(`FUN.PRIVILEGIO IN (${placeholders.join(',')})`)
+        values.push(...privilegios)
+        paramIndex += privilegios.length
+    }
+
+    if (situacao) {
+        const situacoes = Array.isArray(situacao) ? situacao : [situacao]
+        const placeholders = situacoes.map((_, i) => `$${paramIndex + i}`)
+        conditions.push(`SITUACAO IN (${placeholders.join(',')})`)
+        values.push(...situacoes.map(Number))
+        paramIndex += situacoes.length
+    }
+
+    if (conditions.length > 0) {
+        query += ' WHERE ' + conditions.join(' AND ') + ' AND PES.TIPOPESSOA = 2'
+    } else {
+        query += ' WHERE PES.TIPOPESSOA = 2'
+    }
+
+    query += `
+        GROUP BY PES.CODIGOPESSOA, PES.NOME, PES.CONTATO, FUN.CODIGOFUNCIONARIO
+    `;
+
+    console.log(query, values)
+
+    const { rows : funcionarios } = await pool.query(query, values);
 
     reply.status(200).send({ message: 'Funcionarios fetched successfully!', data: funcionarios });
 };
@@ -55,12 +95,9 @@ export const postFuncionario = async(request: FastifyRequest, reply: FastifyRepl
         const queryPessoa = `INSERT INTO PESSOA (NOME, CONTATO, OBSERVACAO, IMAGEM, TIPOPESSOA)
                             VALUES ($1, $2, $3, $4, $5) RETURNING *`;
         const {rows: [pessoaRow]} = await pool.query(queryPessoa, dataPessoa);
-        console.log(pessoaRow)
         // Pega senha temporaria
-        const tempPassword = "000"//generateTempPassword()
+        const tempPassword = generateTempPassword()
         const hashedPassword = await hashPassword(tempPassword)
-
-        console.log(tempPassword, hashedPassword)
 
         const queryFuncionario = "INSERT INTO FUNCIONARIO (EMAIL, DATAADMISSAO, PRIVILEGIO, SENHA, CODIGOPESSOA) VALUES ($1, $2, $3, $4, $5) RETURNING *";
         const data = [funcionario.email, funcionario.dataadmissao, funcionario.privilegio, hashedPassword, pessoaRow.codigopessoa]
@@ -90,8 +127,6 @@ export const putFuncionario = async (request: FastifyRequest, reply: FastifyRepl
 
     const { funcionario: funcionarioField, image } = request.body as { funcionario: { value: string }, image?: MultipartFile };
     const funcionario = JSON.parse(funcionarioField.value);
-
-    console.log(funcionario)
 
     try{
 
@@ -152,8 +187,6 @@ export const putFuncionario = async (request: FastifyRequest, reply: FastifyRepl
             imagem: imagemUrl
         }
 
-        console.log(updatedFuncionario)
-
         await pool.query('COMMIT');
 
         reply.status(200).send({ message: 'Funcionario updated successfully!', data:  updatedFuncionario});
@@ -165,8 +198,6 @@ export const putFuncionario = async (request: FastifyRequest, reply: FastifyRepl
 
 export const resetSenhaFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
     const { funcionario} = request.body 
-
-    console.log(funcionario)
 
     try{
 
@@ -196,9 +227,6 @@ export const resetSenhaFuncionario = async (request: FastifyRequest, reply: Fast
 export const deleteFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
     const { codigopessoa } = request.query as {codigopessoa : number};
     const token = request.cookies.token;
-
-    console.log(codigopessoa)
-
     try{
         if(!codigopessoa){
             return reply.status(400).send({ message: "Funcionario's ID required!" })

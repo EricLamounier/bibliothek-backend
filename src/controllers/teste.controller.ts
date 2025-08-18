@@ -19,22 +19,14 @@ export const postTeste = async (request: FastifyRequest, reply: FastifyReply) =>
 export const putTeste = async (request: FastifyRequest, reply: FastifyReply) => {
   
   const t = request.body;
-  console.log(t)
-
   const select = "SELECT * FROM ALUNO";
   
-  //console.log(alunos)
-
   const query = "UPDATE ALUNO SET DATA_MATRICULA = $1 WHERE ID = $2"
   const data = ['01/01/2001', 15]
 
   const r = await pool.query(query, data);
 
   const {rows: alunos} = await pool.query(select)
-  console.log(alunos)
-
-  //console.log(r)
-
   reply.send(t);
 };
 

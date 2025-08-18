@@ -5,9 +5,9 @@ import { verifyJWT } from '../utils/jwt';
 export const getEmprestimo = async(request: FastifyRequest, reply: FastifyReply) => {
     
     const token = request.cookies.token;
-    const { codigopessoa, datainicio, datafim } = request.query;
-    console.log(codigopessoa, datainicio, datafim)
-
+    const { codigopessoa, livro, datainiciocriacao, datafimcriacao, datainiciodevolucao, datafimdevolucao, situacao } = request.query as { codigopessoa?: number[], livro?: number[], datainiciocriacao?: string, datafimcriacao?: string, datainiciodevolucao?: string, datafimdevolucao?: string, situacao?: number[] };
+    
+    console.log(codigopessoa, livro, datainiciocriacao, datafimcriacao, datainiciodevolucao, datafimdevolucao, situacao)
     try{
 
         if(!token){
@@ -26,8 +26,8 @@ export const getEmprestimo = async(request: FastifyRequest, reply: FastifyReply)
                 PES.*,
                 EMP.OBSERVACAO AS OBSERVACAO,
                 EMP.SITUACAO AS SITUACAO,
-                SUM(EL.QUANTIDADEDEVOLVIDA) AS totaldevolvido,
-                SUM(EL.QUANTIDADEEMPRESTADA)          AS totalemprestado,
+                CAST(SUM(EL.QUANTIDADEDEVOLVIDA) AS INT) AS totaldevolvido,
+                CAST(SUM(EL.QUANTIDADEEMPRESTADA) AS INT) AS totalemprestado,
                 COALESCE(
                     JSON_AGG(
                     DISTINCT 
@@ -56,18 +56,60 @@ export const getEmprestimo = async(request: FastifyRequest, reply: FastifyReply)
             `;
         let data = [];
         let conditions: string[] = [];
+        let paramIndex = 1;
 
         if (codigopessoa) {
-            conditions.push(`EMP.CODIGOPESSOA = $${data.length + 1}`);
-            data.push(codigopessoa);
+            const pessoas = Array.isArray(codigopessoa) ? codigopessoa : [codigopessoa]
+            const placeholders = pessoas.map((_, i) => `$${paramIndex + i}`)
+            conditions.push(`EMP.CODIGOPESSOA IN (${placeholders.join(',')})`)
+            data.push(...pessoas)
+            paramIndex += pessoas.length
         }
-        if (datainicio) {
-            conditions.push(`EMP.DATAEMPRESTIMO >= $${data.length + 1}`);
-            data.push(datainicio);
+        if (livro) {
+            const livros = Array.isArray(livro) ? livro : [livro]
+            const placeholders = livros.map((_, i) => `$${paramIndex + i}`)
+            conditions.push(`EL.CODIGOLIVRO IN (${placeholders.join(',')})`)
+            data.push(...livros)
+            paramIndex += livros.length
         }
-        if (datafim) {
-            conditions.push(`EMP.DATAEMPRESTIMO <= $${data.length + 1}`);
-            data.push(datafim);
+        if (datainiciocriacao) {
+            conditions.push(`EMP.DATAEMPRESTIMO >= $${paramIndex}`);
+            data.push(datainiciocriacao);
+            paramIndex += 1
+        }
+        if (datafimcriacao) {
+            conditions.push(`EMP.DATAEMPRESTIMO <= $${paramIndex}`);
+            data.push(datafimcriacao);
+            paramIndex += 1
+        }
+        if (datainiciodevolucao) {
+            conditions.push(`EMP.DATADEVOLUCAO >= $${paramIndex}`);
+            data.push(datainiciodevolucao);
+            paramIndex += 1
+        }
+        if (datafimdevolucao) {
+            conditions.push(`EMP.DATADEVOLUCAO <= $${paramIndex}`);
+            data.push(datafimdevolucao);
+            paramIndex += 1
+        }
+
+        if(situacao && situacao.length > 0){
+            const situacoes = Array.isArray(situacao) ? situacao : [situacao];
+            const statusConditions: string[] = [];
+            
+            if(situacoes.includes('0')){ // Atrasado
+                statusConditions.push(`(EMP.DATADEVOLUCAO IS NULL AND CURRENT_DATE > EMP.DATADEVOLUCAOPREVISTA)`);
+            }
+            if(situacoes.includes('1')){ // Em dia
+                statusConditions.push(`(EMP.DATADEVOLUCAO IS NULL AND CURRENT_DATE <= EMP.DATADEVOLUCAOPREVISTA)`);
+            }
+            if(situacoes.includes('2')){ // Devolvido
+                statusConditions.push(`(EMP.DATADEVOLUCAO IS NOT NULL)`);
+            }
+            
+            if(statusConditions.length > 0) {
+                conditions.push(`(${statusConditions.join(' OR ')})`);
+            }
         }
         
         if (conditions.length > 0) {
@@ -77,8 +119,6 @@ export const getEmprestimo = async(request: FastifyRequest, reply: FastifyReply)
         query += ' GROUP BY EMP.CODIGOEMPRESTIMO, PES.CODIGOPESSOA, PES.NOME;';
         const {rows} = await pool.query(query, data);
 
-        console.log(rows)
-
         reply.status(200).send({ message: 'Emprestimo found successfully!', data:  rows});
     }catch(err){
         console.log(err)
@@ -86,15 +126,37 @@ export const getEmprestimo = async(request: FastifyRequest, reply: FastifyReply)
     }
 }
 
+export const getExisteEmprestimoAberto = async(request: FastifyRequest, reply: FastifyReply) => {
+    
+    const { codigopessoa } = request.query as { codigopessoa?: number | string };
+    
+    let query = `
+        SELECT COUNT(*) 
+        FROM EMPRESTIMO E JOIN EMPRESTIMO_LIVRO EL ON E.CODIGOEMPRESTIMO = EL.CODIGOEMPRESTIMO
+        WHERE EL.QUANTIDADEEMPRESTADA <> EL.QUANTIDADEDEVOLVIDA 
+    `;
+
+    const params: any[] = [];
+
+    if (codigopessoa) {
+        params.push(codigopessoa);
+        query += ` AND E.CODIGOPESSOA = $${params.length}`;
+    }
+
+    const { rows: emprestimos } = await pool.query(query, params);
+    if(emprestimos[0].count > 0){
+        return reply.status(200).send({ message: 'Emprestimo fetched successfully!', data: true });
+    }
+
+    reply.status(200).send({ message: 'Emprestimo fetched successfully!', data: false });
+}
+
 export const postEmprestimo = async(request: FastifyRequest, reply: FastifyReply) => {
     
     const { emprestimo } = request.body
     const token = request.cookies.token;
 
-    console.log(emprestimo)
-
     try{
-        console.log(emprestimo)
         if(!emprestimo){
             return reply.status(400).send({ message: "Emprestimo required!" })
         }
@@ -127,7 +189,6 @@ export const postEmprestimo = async(request: FastifyRequest, reply: FastifyReply
             ...emprestimo,
             ...newEmprestimo[0]
         }
-        console.log(formtedEmprestimo)
  
         reply.status(200).send({ message: 'Emprestimo inserted successfully!', data:  formtedEmprestimo});
     }catch(err){
@@ -141,7 +202,6 @@ export const postEmprestimo = async(request: FastifyRequest, reply: FastifyReply
 export const devolveEmprestimo = async(request: FastifyRequest, reply: FastifyReply) => {
     const { emprestimo } = request.body 
     const token = request.cookies.token;    
-    console.log(emprestimo)
     
     if(!token){
         return reply.status(401).send({ message: 'Token not found!' });
@@ -165,7 +225,6 @@ export const devolveEmprestimo = async(request: FastifyRequest, reply: FastifyRe
             const queryThisLivro = "SELECT * FROM LIVRO WHERE CODIGOLIVRO = $1";
             const dataThisLivro = [livro.codigolivro]
             const {rows: thisLivro} = await pool.query(queryThisLivro, dataThisLivro);
-            ////console.log(thisLivro)
             
             const queryLivro = "UPDATE EMPRESTIMO_LIVRO SET QUANTIDADEDEVOLVIDA = QUANTIDADEDEVOLVIDA + $1 WHERE CODIGOEMPRESTIMO = $2 AND CODIGOLIVRO = $3 RETURNING *";
             const dataLivro = [livro.quantidade, emprestimo.codigoemprestimo, livro.codigolivro]        
@@ -183,9 +242,7 @@ export const devolveEmprestimo = async(request: FastifyRequest, reply: FastifyRe
 export const renovaEmprestimo = async(request: FastifyRequest, reply: FastifyReply) => {
     const { emprestimo } = request.body 
     const token = request.cookies.token;   
-    
-    //console.log(emprestimo)
-    
+        
     if(!token){
         return reply.status(401).send({ message: 'Token not found!' });
     }

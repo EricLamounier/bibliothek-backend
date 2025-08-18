@@ -21,7 +21,6 @@ export const sendOtp = async (request: FastifyRequest, reply: FastifyReply) => {
 
         const message = `Hey, ${rows[0].nome}! Aqui está seu código de verificação. Ele tem validade de 10 minutos!`;
         const otp = generateCode();
-        console.log(otp)
 
         // Se já existe um código para o e-mail, limpa o timeout anterior
         if (pwdCodes.has(email)) {
@@ -72,7 +71,6 @@ export const checkOtp = async (request: FastifyRequest, reply: FastifyReply) => 
 export const resetPassword = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
         const { email, password } = request.body as { email: string; password: string };
-        console.log(email, password)
 
         const hashedPassword = await hashPassword(password)
         await pool.query('BEGIN');

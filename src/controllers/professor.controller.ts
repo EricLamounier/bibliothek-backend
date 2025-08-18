@@ -12,7 +12,6 @@ export const postProfessor = async(request: FastifyRequest, reply: FastifyReply)
     const professor = JSON.parse(professorField.value);
     let imageUrl = null
 
-    console.log(professor)
     try{
         if(!token){
             return reply.status(401).send({ message: 'Token not found!' });
@@ -52,15 +51,12 @@ export const postProfessor = async(request: FastifyRequest, reply: FastifyReply)
         }
 
         await pool.query('COMMIT');
-        //console.log('ok')
 
         const createdData = {
             ...professorRow,
             disciplinas: professor.disciplinas,
             ...pessoaRow
         }
-
-        console.log(createdData)
  
         reply.status(200).send({ message: 'Professor inserted successfully!', data:  createdData});
     }catch(err){
@@ -71,30 +67,83 @@ export const postProfessor = async(request: FastifyRequest, reply: FastifyReply)
 };
 
 export const getProfessor = async (request: FastifyRequest, reply: FastifyReply) => {
-    const query = `SELECT 
-                    PROF.*,
-                    PES.*,
-                    COALESCE(JSON_AGG(DISTINCT to_jsonb(D)) FILTER (WHERE D.CODIGODISCIPLINA IS NOT NULL), '[]') AS disciplinas
-                    FROM PESSOA PES
-                    JOIN PROFESSOR PROF ON PES.CODIGOPESSOA = PROF.CODIGOPESSOA
-                    LEFT JOIN PROFESSOR_DISCIPLINA PD ON PROF.CODIGOPROFESSOR = PD.CODIGOPROFESSOR
-                    LEFT JOIN DISCIPLINA D ON PD.CODIGODISCIPLINA = D.CODIGODISCIPLINA
-                    WHERE PES.TIPOPESSOA = 1
-                    GROUP BY PES.CODIGOPESSOA, PES.NOME, PES.CONTATO, PROF.CODIGOPROFESSOR;
-                    `;
-    const { rows } = await pool.query(query);
+    const { codigoprofessor, situacao, disciplina } = request.query as { codigoprofessor?: number | number[], situacao?: number | number[], disciplina?: number | number[] }
+  
+    let query = `
+      SELECT 
+        PROF.*,
+        PES.*,
+        COALESCE(
+          JSON_AGG(DISTINCT to_jsonb(D)) FILTER (WHERE D.CODIGODISCIPLINA IS NOT NULL),
+          '[]'
+        ) AS disciplinas
+      FROM PESSOA PES
+      JOIN PROFESSOR PROF ON PES.CODIGOPESSOA = PROF.CODIGOPESSOA
+      LEFT JOIN PROFESSOR_DISCIPLINA PD ON PROF.CODIGOPROFESSOR = PD.CODIGOPROFESSOR
+      LEFT JOIN DISCIPLINA D ON PD.CODIGODISCIPLINA = D.CODIGODISCIPLINA
+    `
+    const conditions: string[] = []
+    const values: any[] = []
+    let paramIndex = 1
 
-    reply.status(200).send({ message: 'Professors fetched successfully!', data: rows });
-};
+    if (codigoprofessor) {
+      const codigos = Array.isArray(codigoprofessor) ? codigoprofessor : [codigoprofessor]
+      const placeholders = codigos.map((_, i) => `$${paramIndex + i}`)
+      conditions.push(`PROF.CODIGOPROFESSOR IN (${placeholders.join(',')})`)
+      values.push(...codigos)
+      paramIndex += codigos.length
+    }
+  
+    // filtro por situação
+    if (situacao) {
+      const situacoes = Array.isArray(situacao) ? situacao : [situacao]
+      const placeholders = situacoes.map((_, i) => `$${paramIndex + i}`)
+      conditions.push(`PES.SITUACAO IN (${placeholders.join(',')})`)
+      values.push(...situacoes.map(Number))
+      paramIndex += situacoes.length
+    }
+  
+    // filtro por disciplina
+    if (disciplina) {
+
+      const disciplinas = Array.isArray(disciplina) ? disciplina : [disciplina]
+      console.log(disciplinas)
+      const placeholders = disciplinas.map((_, i) => `$${paramIndex + i}`)
+      conditions.push(`D.CODIGODISCIPLINA IN (${placeholders.join(',')})`)
+      values.push(...disciplinas)
+      paramIndex += disciplinas.length
+    }
+  
+    // monta WHERE com TIPOPESSOA fixo
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ') + ' AND PES.TIPOPESSOA = 1'
+    } else {
+      query += ' WHERE PES.TIPOPESSOA = 1'
+    }
+  
+    query += `
+      GROUP BY 
+        PES.CODIGOPESSOA, 
+        PES.NOME, 
+        PES.CONTATO, 
+        PROF.CODIGOPROFESSOR
+    `
+  
+    console.log(codigoprofessor, situacao, disciplina) // debug seguro
+  
+    const { rows } = await pool.query(query, values)
+    console.log(rows)
+  
+    reply.status(200).send({ message: 'Professors fetched successfully!', data: rows })
+}
+  
 
 export const putProfessor = async (request: FastifyRequest, reply: FastifyReply) => {
     const token = request.cookies.token;
     
     const { professor: professorField, image } = request.body as { professor: { value: string }, image?: MultipartFile };
     const professor = JSON.parse(professorField.value);
-
     console.log(professor)
-
     try{
 
         if(!token){
@@ -128,7 +177,7 @@ export const putProfessor = async (request: FastifyRequest, reply: FastifyReply)
                 // Remove imagem do banco e deleta do ImageKit
                 if(imagemBDId.imagem){ // tem imagem no banco
                     const queryImagem = 'UPDATE PESSOA SET IMAGEM = $1 WHERE CODIGOPESSOA = $2';
-                    await pool.query(queryImagem, [null, professor.id]);
+                    await pool.query(queryImagem, [null, professor.codigopessoa]);
                     await deleteImages([imagemBDId.imagem]);
                 }
             }else{ // Não alterou a imagem prévia
@@ -148,24 +197,24 @@ export const putProfessor = async (request: FastifyRequest, reply: FastifyReply)
         // Update author relationships
         if (professor.disciplinas && professor.disciplinas.length > 0) {
             const queryInsertDisciplinaProfessor = `
-                INSERT INTO PROFESSOR_DISCIPLINA (CODIGOPROFESSOR, CODIGODISCIPLINA)
-                VALUES ($1, $2)
+                INSERT INTO PROFESSOR_DISCIPLINA (CODIGOPESSOA, CODIGOPROFESSOR, CODIGODISCIPLINA)
+                VALUES ($1, $2, $3)
             `;
             const queryDeleteDisciplinaProfessor = `
                 DELETE FROM PROFESSOR_DISCIPLINA
-                WHERE CODIGOPROFESSOR = $1 AND CODIGODISCIPLINA = $2
+                WHERE CODIGOPESSOA = $1 AND CODIGODISCIPLINA = $2
             `;
 
             for (const disciplina of professor.disciplinas) {
 
                 // Insere novo autor
                 if(disciplina.sync === 1){
-                    await pool.query(queryInsertDisciplinaProfessor, [professor.codigoprofessor, disciplina.codigodisciplina]);
+                    await pool.query(queryInsertDisciplinaProfessor, [professor.codigopessoa, professor.codigoprofessor, disciplina.codigodisciplina]);
                 }
 
                 // Exclui autor
                 if(disciplina.sync === 2){
-                    await pool.query(queryDeleteDisciplinaProfessor, [professor.codigoprofessor, disciplina.codigodisciplina]);
+                    await pool.query(queryDeleteDisciplinaProfessor, [professor.codigopessoa, disciplina.codigodisciplina]);
                 }
             }
         }
@@ -177,8 +226,6 @@ export const putProfessor = async (request: FastifyRequest, reply: FastifyReply)
                 .filter((disciplina: any) => disciplina.sync !== 2)
                 .map((disciplina: any) => ({ ...disciplina, sync: 0 })),
         }
-
-        console.log(updatedProfessor)
 
         await pool.query('COMMIT');
 
