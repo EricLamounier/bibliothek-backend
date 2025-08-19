@@ -28,7 +28,7 @@ export const postProfessor = async(request: FastifyRequest, reply: FastifyReply)
             try {
                 imageUrl = await processAndUploadImage(image, '/PessoasImagens');
             } catch (err) {
-                console.log(err)
+                //console.log(err)
                 return reply.status(500).send({ message: 'Failed to upload image', error: err });
             }
         }
@@ -61,7 +61,7 @@ export const postProfessor = async(request: FastifyRequest, reply: FastifyReply)
         reply.status(200).send({ message: 'Professor inserted successfully!', data:  createdData});
     }catch(err){
         await pool.query('ROLLBACK');
-        console.log(err)
+        //console.log(err)
         reply.status(500).send({ message: 'Professor not inserted!', data: err });
     }
 };
@@ -107,7 +107,7 @@ export const getProfessor = async (request: FastifyRequest, reply: FastifyReply)
     if (disciplina) {
 
       const disciplinas = Array.isArray(disciplina) ? disciplina : [disciplina]
-      console.log(disciplinas)
+      //console.log(disciplinas)
       const placeholders = disciplinas.map((_, i) => `$${paramIndex + i}`)
       conditions.push(`D.CODIGODISCIPLINA IN (${placeholders.join(',')})`)
       values.push(...disciplinas)
@@ -129,10 +129,10 @@ export const getProfessor = async (request: FastifyRequest, reply: FastifyReply)
         PROF.CODIGOPROFESSOR
     `
   
-    console.log(codigoprofessor, situacao, disciplina) // debug seguro
+    //console.log(codigoprofessor, situacao, disciplina) // debug seguro
   
     const { rows } = await pool.query(query, values)
-    console.log(rows)
+    //console.log(rows)
   
     reply.status(200).send({ message: 'Professors fetched successfully!', data: rows })
 }
@@ -143,7 +143,7 @@ export const putProfessor = async (request: FastifyRequest, reply: FastifyReply)
     
     const { professor: professorField, image } = request.body as { professor: { value: string }, image?: MultipartFile };
     const professor = JSON.parse(professorField.value);
-    console.log(professor)
+    //console.log(professor)
     try{
 
         if(!token){
@@ -232,7 +232,7 @@ export const putProfessor = async (request: FastifyRequest, reply: FastifyReply)
         reply.status(200).send({ message: 'Professor updated successfully!', data: updatedProfessor});
     }catch(err){
         await pool.query('ROLLBACK');
-        console.log(err)
+        //console.log(err)
         reply.status(500).send({ message: 'Professor not updated!', data: err });
     }
 };
@@ -273,7 +273,7 @@ export const deleteProfessor = async (request: FastifyRequest, reply: FastifyRep
         reply.status(200).send({ message: 'Professor deleted successfully!', data:  []});
     }catch(err){
         await pool.query('ROLLBACK');
-        console.log(err)
+        //console.log(err)
         reply.status(500).send({ message: 'Professor not deleted!', data: err });
     }
 };

@@ -70,7 +70,7 @@ export const getAutor = async (request: FastifyRequest, reply: FastifyReply) => 
   
     query += ' GROUP BY CODIGOAUTOR, NOME, OBSERVACAO, SITUACAO'
   
-    console.log(query, values)
+    //console.log(query, values)
   
     const { rows } = await pool.query(query, values)
   

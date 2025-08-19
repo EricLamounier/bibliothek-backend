@@ -16,7 +16,7 @@ export async function renameImage(filePath: string, newFileName: string, folder 
         purgeCache: false, // optional
     });
 
-    console.log(`[ImageKit] Arquivo renomeado com sucesso:`, `${newFileName}.png`);
+    //console.log(`[ImageKit] Arquivo renomeado com sucesso:`, `${newFileName}.png`);
     return true;
   } catch (error) {
     console.error(`[ImageKit] Erro ao renomear imagem com ID ${filePath}:`, error);
@@ -70,13 +70,13 @@ async function compressImage(buffer: Buffer, targetSizeKB: number): Promise<Buff
 }
 
 export async function uploadImage(buffer: Buffer, filename: string, folder: string): Promise<string> {
-  console.log('[ImageKit] Enviando imagem:', filename);
+  //console.log('[ImageKit] Enviando imagem:', filename);
   
   // Comprime a imagem para no máximo 10KB
   const maxSizeKB = 20;
   const compressedBuffer = await compressImage(buffer, maxSizeKB);
   
-  console.log(`[ImageKit] Tamanho original: ${(buffer.length / 1024).toFixed(2)}KB, ` +
+  //console.log(`[ImageKit] Tamanho original: ${(buffer.length / 1024).toFixed(2)}KB, ` +
               `Comprimido: ${(compressedBuffer.length / 1024).toFixed(2)}KB`);
 
   const tempFileName = `${Date.now()}_${filename}.png`;
@@ -89,7 +89,7 @@ export async function uploadImage(buffer: Buffer, filename: string, folder: stri
 
   const newName = await renameImage(result.filePath, result.fileId, folder);
 
-  console.log('[ImageKit] Upload concluído:', newName);
+  //console.log('[ImageKit] Upload concluído:', newName);
   return result.fileId;
 }
 
@@ -97,7 +97,7 @@ export async function deleteImages(fileIds: string[]): Promise<void> {
   for (const fileId of fileIds) {
     try {
       await imagekit.deleteFile(fileId);
-      console.log(`[ImageKit] Imagem com ID ${fileId} deletada com sucesso.`);
+      //console.log(`[ImageKit] Imagem com ID ${fileId} deletada com sucesso.`);
     } catch (error) {
       console.error(`[ImageKit] Erro ao deletar imagem com ID ${fileId}:`, error);
     }
@@ -107,8 +107,8 @@ export async function deleteImages(fileIds: string[]): Promise<void> {
 export async function processAndUploadImage(imageField: any, folder: string): Promise<string | null> {
   if (!imageField) return null;
 
-  console.log('[processAndUploadImage] Iniciando processamento da imagem...');
-  console.log('[processAndUploadImage] Stream legível:', imageField.file.readable);
+  //console.log('[processAndUploadImage] Iniciando processamento da imagem...');
+  //console.log('[processAndUploadImage] Stream legível:', imageField.file.readable);
 
   let imageBuffer: Buffer;
 
@@ -125,13 +125,13 @@ export async function processAndUploadImage(imageField: any, folder: string): Pr
       imageBuffer = Buffer.concat(chunks);
     }
 
-    console.log('[processAndUploadImage] Tamanho do buffer:', imageBuffer.length);
-    console.log('[processAndUploadImage] Primeiros bytes:', imageBuffer.subarray(0, 10));
+    //console.log('[processAndUploadImage] Tamanho do buffer:', imageBuffer.length);
+    //console.log('[processAndUploadImage] Primeiros bytes:', imageBuffer.subarray(0, 10));
 
     const filename = imageField.filename || 'imagem.jpg';
 
     const imageUrl = await uploadImage(imageBuffer, filename, folder);
-    console.log('[processAndUploadImage] Upload concluído:', imageUrl);
+    //console.log('[processAndUploadImage] Upload concluído:', imageUrl);
 
     return imageUrl;
 

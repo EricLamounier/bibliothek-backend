@@ -36,7 +36,7 @@ export const postEditora = async(request: FastifyRequest, reply: FastifyReply) =
 
 export const getEditora = async (request: FastifyRequest, reply: FastifyReply) => {
     const { editora, situacao } = request.query as { editora?: string | string[], situacao?: number | number[] }
-    console.log(editora, situacao)
+    //console.log(editora, situacao)
     let query = `
       SELECT * 
       FROM EDITORA
@@ -53,7 +53,7 @@ export const getEditora = async (request: FastifyRequest, reply: FastifyReply) =
       paramIndex += situacoes.length
     }
 
-    console.log(editora)
+    //console.log(editora)
   
     if (editora) {
       const editoras = Array.isArray(editora) ? editora : [editora]
@@ -70,7 +70,7 @@ export const getEditora = async (request: FastifyRequest, reply: FastifyReply) =
     query += ' GROUP BY CODIGOEDITORA, NOME, OBSERVACAO, SITUACAO'
   
     const { rows } = await pool.query(query, values)
-    console.log(query)
+    //console.log(query)
     reply.status(200).send({ message: 'Editoras fetched successfully!', data: rows })
   }
   
@@ -135,7 +135,7 @@ export const putEditora = async (request: FastifyRequest, reply: FastifyReply) =
         reply.status(200).send({ message: 'Editora updated successfully!', data:  rows[0]});
 
     }catch(err){
-        console.log(err)
+        //console.log(err)
         reply.status(200).send({ message: 'Editora not updated!', data: err });
     }
 };

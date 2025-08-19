@@ -7,15 +7,13 @@ import { MultipartFile } from '@fastify/multipart';
 export const getLivro = async (request: FastifyRequest, reply: FastifyReply) => {
     const { codigolivro, autor, editora, disponibilidade, situacao } = request.query as { codigolivro?: number[], autor?: number[], editora?: number[], disponibilidade?: number[], situacao?: number[] };
     
-    console.log(disponibilidade)
+    //console.log(codigolivro, autor, editora, disponibilidade, situacao)
     try {
-        // First get all books
         let queryLivros = `
             SELECT DISTINCT l.*
             FROM LIVRO l
         `;
         
-        // Add JOIN for author filter if needed
         if (autor) {
             queryLivros += `
                 JOIN LIVRO_AUTOR LA ON l.CODIGOLIVRO = LA.CODIGOLIVRO
@@ -73,10 +71,8 @@ export const getLivro = async (request: FastifyRequest, reply: FastifyReply) => 
             queryLivros += ' WHERE ' + conditions.join(' AND ');
         }
 
-        console.log(queryLivros, params)
         const { rows: livros } = await pool.query(queryLivros, params);
 
-        // For each book, get its authors
         const livrosComAutores = await Promise.all(livros.map(async (livro : any) => {
             const queryAutores = `
                 SELECT LA.*, A.NOME
@@ -96,7 +92,7 @@ export const getLivro = async (request: FastifyRequest, reply: FastifyReply) => 
             data: livrosComAutores 
         });
     } catch (err) {
-        console.log(err)
+        //console.log(err)
         reply.status(500).send({ 
             message: 'Error fetching livros!', 
             data: err 
@@ -202,7 +198,7 @@ export const postLivro = async(request: FastifyRequest, reply: FastifyReply) => 
 
     } catch(err : any) {
         await pool.query('ROLLBACK');
-        console.log(err)
+        //console.log(err)
         imageUrl && await deleteImages([imageUrl])
         reply.status(500).send({ message: 'Livro not inserted!', data: err, errorMessage: err?.message });
     }

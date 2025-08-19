@@ -19,10 +19,10 @@ const pool = new Pool({
 async function connect() {
   try {
     await pool.connect();
-    console.log("Conectado ao CockroachDB com sucesso!");
+    //console.log("Conectado ao CockroachDB com sucesso!");
 
     const res = await pool.query("SELECT NOW()"); // query de teste
-    console.log("Resultado da query:", res.rows);
+    //console.log("Resultado da query:", res.rows);
 
   } catch (err) {
     console.error("Erro ao conectar:", err);

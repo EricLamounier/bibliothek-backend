@@ -7,7 +7,7 @@ export const getEmprestimo = async(request: FastifyRequest, reply: FastifyReply)
     const token = request.cookies.token;
     const { codigopessoa, livro, datainiciocriacao, datafimcriacao, datainiciodevolucao, datafimdevolucao, situacao } = request.query as { codigopessoa?: number[], livro?: number[], datainiciocriacao?: string, datafimcriacao?: string, datainiciodevolucao?: string, datafimdevolucao?: string, situacao?: number[] };
     
-    console.log(codigopessoa, livro, datainiciocriacao, datafimcriacao, datainiciodevolucao, datafimdevolucao, situacao)
+    //console.log(codigopessoa, livro, datainiciocriacao, datafimcriacao, datainiciodevolucao, datafimdevolucao, situacao)
     try{
 
         if(!token){
@@ -121,7 +121,7 @@ export const getEmprestimo = async(request: FastifyRequest, reply: FastifyReply)
 
         reply.status(200).send({ message: 'Emprestimo found successfully!', data:  rows});
     }catch(err){
-        console.log(err)
+        //console.log(err)
         reply.status(500).send({ message: 'Emprestimo not found!', data: err });
     }
 }
@@ -193,7 +193,7 @@ export const postEmprestimo = async(request: FastifyRequest, reply: FastifyReply
         reply.status(200).send({ message: 'Emprestimo inserted successfully!', data:  formtedEmprestimo});
     }catch(err){
         await pool.query('ROLLBACK');
-        console.log(err)
+        //console.log(err)
         reply.status(500).send({ message: 'Emprestimo not inserted!', data: err });
     }
     
@@ -234,7 +234,7 @@ export const devolveEmprestimo = async(request: FastifyRequest, reply: FastifyRe
         reply.status(200).send({ message: 'Emprestimo returned successfully!', data:  'sucess' });
     }catch(err){
         await pool.query('ROLLBACK');
-        console.log(err)
+        //console.log(err)
         reply.status(500).send({ message: 'Emprestimo not returned!', data: err });
     }
 }

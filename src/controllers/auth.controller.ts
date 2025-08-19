@@ -10,8 +10,9 @@ dotenv.config();
 export const authLogin = async (request: FastifyRequest, reply: FastifyReply) => {
     try{
         const { email, password } = request.body as { email: string; password: string };
-        const { rows } = await pool.query("SELECT FUN.*, PES.SITUACAO FROM FUNCIONARIO FUN JOIN PESSOA PES ON FUN.CODIGOPESSOA = PES.CODIGOPESSOA WHERE EMAIL = $1 LIMIT 1", [email]);
+        const { rows } = await pool.query("SELECT FUN.*, PES.* FROM FUNCIONARIO FUN JOIN PESSOA PES ON FUN.CODIGOPESSOA = PES.CODIGOPESSOA WHERE EMAIL = $1 LIMIT 1", [email]);
 
+        //console.log(email, password)
         if (rows.length === 0) {
             return reply.code(401).send({ error: "Usuário ou senha incorretos!" });
         }
@@ -24,7 +25,7 @@ export const authLogin = async (request: FastifyRequest, reply: FastifyReply) =>
             return reply.code(401).send({ error: "Usuário ou senha incorretos!" });
         }
 
-        const JWTToken = await createJWT(rows[0].codigopessoa);
+        const JWTToken = await createJWT(rows[0]);
 
         reply
             .setCookie('token', JWTToken, { // Correção do nome da variável
@@ -37,6 +38,7 @@ export const authLogin = async (request: FastifyRequest, reply: FastifyReply) =>
             .code(200)
             .send({ message: 'Logged successfully!', data: JWTToken});
     }catch(err){
+        //console.log(err)
         reply.code(400).send({ message: 'Something went wrong!', data: err});
     }
 };
@@ -161,7 +163,7 @@ export const putConta = async (request: FastifyRequest, reply: FastifyReply) => 
 
         reply.code(200).send({ message: "Conta atualizada com sucesso!", data: novaConta });
     }catch(err){
-        console.log(err)
+        //console.log(err)
         await pool.query('ROLLBACK');
         reply.code(400).send({ message: "Something went wrong!", data: err });
     }

@@ -43,6 +43,7 @@ app.register(cors, {
           "http://192.168.3.9:5173", 
           "https://192.168.3.9:5173", 
           "http://200.18.135.228:5173",
+          "https://mybibliothek.serveo.net",
           "https://willing-enabling-mastiff.ngrok-free.app"],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],

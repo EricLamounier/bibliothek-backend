@@ -7,7 +7,7 @@ import { MultipartFile } from '@fastify/multipart';
 
 export const getFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
     const { funcionario, privilegio, situacao } = request.query as { funcionario?: number, privilegio?: string, situacao?: string };
-    console.log(funcionario, privilegio, situacao)
+    //console.log(funcionario, privilegio, situacao)
     let query = `SELECT 
                     PES.*,
                     FUN.CODIGOFUNCIONARIO,
@@ -54,7 +54,7 @@ export const getFuncionario = async (request: FastifyRequest, reply: FastifyRepl
         GROUP BY PES.CODIGOPESSOA, PES.NOME, PES.CONTATO, FUN.CODIGOFUNCIONARIO
     `;
 
-    console.log(query, values)
+    //console.log(query, values)
 
     const { rows : funcionarios } = await pool.query(query, values);
 
@@ -84,7 +84,7 @@ export const postFuncionario = async(request: FastifyRequest, reply: FastifyRepl
             try {
                 imageUrl = await processAndUploadImage(image, '/PessoasImagens');
             } catch (err) {
-                console.log(err)
+                //console.log(err)
                 return reply.status(500).send({ message: 'Failed to upload image', error: err });
             }
         }
@@ -116,7 +116,7 @@ export const postFuncionario = async(request: FastifyRequest, reply: FastifyRepl
  
         reply.status(200).send({ message: 'Funcionario inserted successfully!', data:  formatedFuncionario});
     }catch(err : any){
-        console.log(err)
+        //console.log(err)
         imageUrl && await deleteImages([imageUrl])
         reply.status(500).send({ message: 'Funcionario not inserted!', data: err, errorMessage: err?.message });
     }
@@ -191,7 +191,7 @@ export const putFuncionario = async (request: FastifyRequest, reply: FastifyRepl
 
         reply.status(200).send({ message: 'Funcionario updated successfully!', data:  updatedFuncionario});
     }catch(err : any){
-        console.log(err)
+        //console.log(err)
         reply.status(500).send({ message: 'Funcionario not updated!', data: err, errorMessage: err?.message });
     }
 };
@@ -218,7 +218,7 @@ export const resetSenhaFuncionario = async (request: FastifyRequest, reply: Fast
         reply.status(200).send({ message: 'Funcionario updated successfully!', data:  funcionario});
         await pool.query('COMMIT');
     }catch(err : any){
-        console.log(err)
+        //console.log(err)
         await pool.query('ROLLBACK');
         reply.status(500).send({ message: 'Funcionario not updated!', data: err, errorMessage: err?.message });
     }

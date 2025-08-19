@@ -18,5 +18,5 @@ app.listen({ port: PORT, host: HOST }, (err, address) => {
     console.error(err);
     process.exit(1);
   }
-  console.log(`🚀 Servidor rodando em ${address}`);
+  //console.log(`🚀 Servidor rodando em ${address}`);
 });

@@ -6,7 +6,7 @@ import { MultipartFile } from '@fastify/multipart';
 
 export const getAluno = async (request: FastifyRequest, reply: FastifyReply) => {
     const { aluno, situacao } = request.query as { aluno?: number, situacao?: string };
-    console.log(aluno, situacao)
+    //console.log(aluno, situacao)
     let query = `
         SELECT
             PES.*,
@@ -93,7 +93,7 @@ export const getProfessor222 = async (request: FastifyRequest, reply: FastifyRep
     if (disciplina) {
 
       const disciplinas = Array.isArray(disciplina) ? disciplina : [disciplina]
-      console.log(disciplinas)
+      //console.log(disciplinas)
       const placeholders = disciplinas.map((_, i) => `$${paramIndex + i}`)
       conditions.push(`D.CODIGODISCIPLINA IN (${placeholders.join(',')})`)
       values.push(...disciplinas)
@@ -115,10 +115,10 @@ export const getProfessor222 = async (request: FastifyRequest, reply: FastifyRep
         PROF.CODIGOPROFESSOR
     `
   
-    console.log(codigoprofessor, situacao, disciplina) // debug seguro
+    //console.log(codigoprofessor, situacao, disciplina) // debug seguro
   
     const { rows } = await pool.query(query, values)
-    console.log(rows)
+    //console.log(rows)
   
     reply.status(200).send({ message: 'Professors fetched successfully!', data: rows })
 }
@@ -146,7 +146,7 @@ export const postAluno = async(request: FastifyRequest, reply: FastifyReply) => 
             try {
                 imageUrl = await processAndUploadImage(image, '/PessoasImagens');
             } catch (err) {
-                console.log(err)
+                //console.log(err)
                 return reply.status(500).send({ message: 'Failed to upload image', error: err });
             }
         }
@@ -171,7 +171,7 @@ export const postAluno = async(request: FastifyRequest, reply: FastifyReply) => 
  
         reply.status(200).send({ message: 'Aluno inserted successfully!', data:  createdData});
     }catch(err : any){
-        console.log(err)
+        //console.log(err)
         imageUrl && await deleteImages([imageUrl])
         reply.status(500).send({ message: 'Aluno not inserted!', data: err, errorMessage: err?.message });
     }
@@ -247,7 +247,7 @@ export const putAluno = async (request: FastifyRequest, reply: FastifyReply) => 
 
         reply.status(200).send({ message: 'Aluno updated successfully!', data:  updatedAluno});
     }catch(err : any){
-        console.log(err)
+        //console.log(err)
         reply.status(500).send({ message: 'Aluno not updated!', data: err, errorMessage: err?.message });
     }
 };
