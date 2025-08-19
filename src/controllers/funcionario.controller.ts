@@ -191,7 +191,7 @@ export const putFuncionario = async (request: FastifyRequest, reply: FastifyRepl
 
         reply.status(200).send({ message: 'Funcionario updated successfully!', data:  updatedFuncionario});
     }catch(err : any){
-        //console.log(err)
+        console.log(err)
         reply.status(500).send({ message: 'Funcionario not updated!', data: err, errorMessage: err?.message });
     }
 };

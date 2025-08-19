@@ -155,6 +155,7 @@ export const postEmprestimo = async(request: FastifyRequest, reply: FastifyReply
     
     const { emprestimo } = request.body as {emprestimo : any};
     const token = request.cookies.token;
+    console.log(emprestimo)
 
     try{
         if(!emprestimo){
@@ -193,7 +194,7 @@ export const postEmprestimo = async(request: FastifyRequest, reply: FastifyReply
         reply.status(200).send({ message: 'Emprestimo inserted successfully!', data:  formtedEmprestimo});
     }catch(err){
         await pool.query('ROLLBACK');
-        //console.log(err)
+        console.log(err)
         reply.status(500).send({ message: 'Emprestimo not inserted!', data: err });
     }
     

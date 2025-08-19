@@ -17,6 +17,7 @@ export const createJWT = async (funcionarioID: number | string) => {
 
 export const verifyJWT = async (token: string) => {
   try {
+    console.log(jwt.verify(token, PUBLIC_KEY, { algorithms: ['RS256'] }))
     return jwt.verify(token, PUBLIC_KEY, { algorithms: ['RS256'] });
   } catch {
     return null;

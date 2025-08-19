@@ -58,7 +58,8 @@ export const authJWT = async(request: FastifyRequest, reply: FastifyReply) => {
             FROM PESSOA PES JOIN FUNCIONARIO FUN ON PES.CODIGOPESSOA = FUN.CODIGOPESSOA
             WHERE PES.TIPOPESSOA = 2 AND FUN.CODIGOPESSOA = $1 LIMIT 1
         `
-        const data = resp.funcionarioID
+        console.log(resp.funcionarioID)
+        const data = resp.funcionarioID.codigopessoa
         const result = await pool.query(query, [data])
         const funcionario = result.rows[0]
         const { senha, ...funcionarioFormated } = funcionario;

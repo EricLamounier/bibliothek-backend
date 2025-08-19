@@ -64,9 +64,9 @@ export const sendEmails = async(name: any, email: any, code: string, text: strin
 
 		transporter.sendMail(mailOptions, (error: any, info: { response: any; }) => {
 		  if (error) {
-			//console.log('Error:', error);
+			console.log('Error:', error);
 		  } else {
-			//console.log('Email sent:', info.response);
+			console.log('Email sent:', info.response);
 		  }
 		});
 		await sleep(5000);

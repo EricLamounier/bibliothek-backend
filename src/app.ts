@@ -30,7 +30,7 @@ app.register(fastifyMultipart, {
   }
 });
 app.register(cors, {
-  origin: ["https://192.168.3.9:5173"],
+  origin: ["http://192.168.3.9:5173", "https://bibliothek0.vercel.app"],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 });
