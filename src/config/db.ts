@@ -10,11 +10,11 @@ types.setTypeParser(23, (val) => parseInt(val, 10));
 
 dotenv.config();
 
-const pool = new Pool({
+/*const pool = new Pool({
   connectionString: process.env.DATABASE_URL_LOCAL,
-});
+});*/
 
-//const pool = new Client(process.env.DATABASE_URL);
+const pool = new Client(process.env.DATABASE_URL);
 
 async function connect() {
   try {

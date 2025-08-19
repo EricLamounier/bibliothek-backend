@@ -76,8 +76,8 @@ export async function uploadImage(buffer: Buffer, filename: string, folder: stri
   const maxSizeKB = 20;
   const compressedBuffer = await compressImage(buffer, maxSizeKB);
   
-  //console.log(`[ImageKit] Tamanho original: ${(buffer.length / 1024).toFixed(2)}KB, ` +
-              `Comprimido: ${(compressedBuffer.length / 1024).toFixed(2)}KB`);
+  /*console.log(`[ImageKit] Tamanho original: ${(buffer.length / 1024).toFixed(2)}KB, ` +
+              `Comprimido: ${(compressedBuffer.length / 1024).toFixed(2)}KB`);*/
 
   const tempFileName = `${Date.now()}_${filename}.png`;
 

@@ -5,7 +5,7 @@ import { verifyJWT } from '../utils/jwt';
 export const getEmprestimo = async(request: FastifyRequest, reply: FastifyReply) => {
     
     const token = request.cookies.token;
-    const { codigopessoa, livro, datainiciocriacao, datafimcriacao, datainiciodevolucao, datafimdevolucao, situacao } = request.query as { codigopessoa?: number[], livro?: number[], datainiciocriacao?: string, datafimcriacao?: string, datainiciodevolucao?: string, datafimdevolucao?: string, situacao?: number[] };
+    const { codigopessoa, livro, datainiciocriacao, datafimcriacao, datainiciodevolucao, datafimdevolucao, situacao } = request.query as { codigopessoa?: number[], livro?: number[], datainiciocriacao?: string, datafimcriacao?: string, datainiciodevolucao?: string, datafimdevolucao?: string, situacao?: string[] };
     
     //console.log(codigopessoa, livro, datainiciocriacao, datafimcriacao, datainiciodevolucao, datafimdevolucao, situacao)
     try{
@@ -153,7 +153,7 @@ export const getExisteEmprestimoAberto = async(request: FastifyRequest, reply: F
 
 export const postEmprestimo = async(request: FastifyRequest, reply: FastifyReply) => {
     
-    const { emprestimo } = request.body
+    const { emprestimo } = request.body as {emprestimo : any};
     const token = request.cookies.token;
 
     try{
@@ -200,7 +200,7 @@ export const postEmprestimo = async(request: FastifyRequest, reply: FastifyReply
 }
 
 export const devolveEmprestimo = async(request: FastifyRequest, reply: FastifyReply) => {
-    const { emprestimo } = request.body 
+    const { emprestimo } = request.body as {emprestimo : any};
     const token = request.cookies.token;    
     
     if(!token){
@@ -240,7 +240,7 @@ export const devolveEmprestimo = async(request: FastifyRequest, reply: FastifyRe
 }
 
 export const renovaEmprestimo = async(request: FastifyRequest, reply: FastifyReply) => {
-    const { emprestimo } = request.body 
+    const { emprestimo } = request.body as {emprestimo : any};
     const token = request.cookies.token;   
         
     if(!token){

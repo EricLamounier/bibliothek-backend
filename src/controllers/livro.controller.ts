@@ -5,7 +5,7 @@ import { deleteImages, processAndUploadImage } from '../utils/imagekit';
 import { MultipartFile } from '@fastify/multipart';
 
 export const getLivro = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { codigolivro, autor, editora, disponibilidade, situacao } = request.query as { codigolivro?: number[], autor?: number[], editora?: number[], disponibilidade?: number[], situacao?: number[] };
+    const { codigolivro, autor, editora, disponibilidade, situacao } = request.query as { codigolivro?: number[], autor?: number[], editora?: number[], disponibilidade?: string[], situacao?: string[] };
     
     //console.log(codigolivro, autor, editora, disponibilidade, situacao)
     try {

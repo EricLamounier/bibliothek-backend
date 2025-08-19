@@ -30,7 +30,7 @@ app.register(fastifyMultipart, {
   }
 });
 app.register(cors, {
-  origin: ["*"],
+  origin: ["https://192.168.3.9:5173"],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 });

@@ -197,7 +197,7 @@ export const putFuncionario = async (request: FastifyRequest, reply: FastifyRepl
 };
 
 export const resetSenhaFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { funcionario} = request.body 
+    const { funcionario} = request.body as {funcionario : any}; 
 
     try{
 
