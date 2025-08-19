@@ -15,19 +15,11 @@ import livroRoutes from './routes/livro.route';
 import emprestimoRoutes from './routes/emprestimo.route';
 import testeRoutes from './routes/teste.route';
 import resetPasswordRoute from './routes/resetPassword.route';
-import fs from 'fs';
-
-const httpsOptions = {
-  key: fs.readFileSync('./localhost-key.pem'),
-  cert: fs.readFileSync('./localhost.pem')
-};
-
 
 const app = Fastify({
   logger: {
     level: 'warn', // Apenas logs de warning ou erro
   },
-  https: httpsOptions
 });
 
 app.register(formbody);
@@ -38,13 +30,7 @@ app.register(fastifyMultipart, {
   }
 });
 app.register(cors, {
-  origin: ["http://localhost:5173", 
-          "https://localhost:5173",
-          "http://192.168.3.9:5173", 
-          "https://192.168.3.9:5173", 
-          "http://200.18.135.228:5173",
-          "https://mybibliothek.serveo.net",
-          "https://willing-enabling-mastiff.ngrok-free.app"],
+  origin: ["*"],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 });

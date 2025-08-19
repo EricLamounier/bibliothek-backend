@@ -3,9 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const PORT = Number(process.env.PORT) || 3000;
-const HOST = '0.0.0.0' // Permite acessar pelo IP da máquina na rede
-// const HOST = '169.254.83.107'
-console.clear();
+const HOST = '0.0.0.0'
 
 app.get('/favicon.ico', (req, res) => res.status(204));
 
@@ -18,5 +16,4 @@ app.listen({ port: PORT, host: HOST }, (err, address) => {
     console.error(err);
     process.exit(1);
   }
-  //console.log(`🚀 Servidor rodando em ${address}`);
 });
