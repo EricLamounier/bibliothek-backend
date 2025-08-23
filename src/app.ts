@@ -3,6 +3,7 @@ import formbody from '@fastify/formbody';
 import cors from '@fastify/cors';
 import fastifyMultipart from '@fastify/multipart';
 import cookie from '@fastify/cookie';
+import https from 'https';
 
 import authenticationRoute from './routes/auth.route';
 import editoraRoutes from './routes/editora.route';
@@ -15,11 +16,18 @@ import livroRoutes from './routes/livro.route';
 import emprestimoRoutes from './routes/emprestimo.route';
 import testeRoutes from './routes/teste.route';
 import resetPasswordRoute from './routes/resetPassword.route';
+import fs from 'fs';
+
+const httpsOptions = {
+  key: fs.readFileSync('./localhost-key.pem'),
+  cert: fs.readFileSync('./localhost.pem')
+};
 
 const app = Fastify({
   logger: {
     level: 'warn', // Apenas logs de warning ou erro
   },
+  https: httpsOptions
 });
 
 app.register(formbody);
@@ -30,7 +38,7 @@ app.register(fastifyMultipart, {
   }
 });
 app.register(cors, {
-  origin: ["http://192.168.3.9:5173", "https://bibliothek0.vercel.app"],
+  origin: ["http://192.168.3.9:5173", "https://192.168.3.9:5173", "https://bibliothek0.vercel.app"],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 });

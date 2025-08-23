@@ -89,7 +89,7 @@ export const getProfessor = async (request: FastifyRequest, reply: FastifyReply)
     if (codigoprofessor) {
       const codigos = Array.isArray(codigoprofessor) ? codigoprofessor : [codigoprofessor]
       const placeholders = codigos.map((_, i) => `$${paramIndex + i}`)
-      conditions.push(`PROF.CODIGOPROFESSOR IN (${placeholders.join(',')})`)
+      conditions.push(`PROF.CODIGOPESSOA IN (${placeholders.join(',')})`)
       values.push(...codigos)
       paramIndex += codigos.length
     }

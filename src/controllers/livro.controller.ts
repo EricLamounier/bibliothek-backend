@@ -5,9 +5,19 @@ import { deleteImages, processAndUploadImage } from '../utils/imagekit';
 import { MultipartFile } from '@fastify/multipart';
 
 export const getLivro = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { codigolivro, autor, editora, disponibilidade, situacao } = request.query as { codigolivro?: number[], autor?: number[], editora?: number[], disponibilidade?: string[], situacao?: string[] };
+    const { codigolivro, autor, editora, disponibilidade, situacao, token } = request.query as { codigolivro?: number[], autor?: number[], editora?: number[], disponibilidade?: string[], situacao?: string[], token?: string };
     
-    //console.log(codigolivro, autor, editora, disponibilidade, situacao)
+    if(!token){
+        return reply.status(401).send({ message: 'Token not found!' });
+    }
+    
+    const res = await verifyJWT(token);
+    
+    /*if(!res){
+        return reply.status(401).send({ message: 'Expired section!', data: ''});
+    }*/
+    
+    console.log(codigolivro, autor, editora, disponibilidade, situacao)
     try {
         let queryLivros = `
             SELECT DISTINCT l.*
@@ -92,7 +102,7 @@ export const getLivro = async (request: FastifyRequest, reply: FastifyReply) => 
             data: livrosComAutores 
         });
     } catch (err) {
-        //console.log(err)
+        console.log(err)
         reply.status(500).send({ 
             message: 'Error fetching livros!', 
             data: err 
