@@ -10,8 +10,8 @@ function renderTemplate(template: string, data: { [x: string]: any; verification
     return template.replace(/{{(\w+)}}/g, (_: any, key: string | number) => data[key] || text);
 }
 
-export const generateTempPassword = (length = 8) => {
-    const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?";
+export const generateTempPassword = (length = 6) => {
+    const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#";
     return Array.from({ length }, () => charset[Math.floor(Math.random() * charset.length)]).join('');
 };
 

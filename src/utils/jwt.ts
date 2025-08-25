@@ -8,8 +8,8 @@ dotenv.config()
 const PRIVATE_KEY = fs.readFileSync(path.join(__dirname, '../../private.key'), 'utf8');
 const PUBLIC_KEY = fs.readFileSync(path.join(__dirname, '../../public.key'), 'utf8');
 
-export const createJWT = async (funcionarioID: number | string) => {
-  return jwt.sign({ funcionarioID }, PRIVATE_KEY, {
+export const createJWT = async (funcionario: number | string) => {
+  return jwt.sign({ funcionario }, PRIVATE_KEY, {
     algorithm: 'RS256',
     expiresIn: '30d',
   });
@@ -17,9 +17,9 @@ export const createJWT = async (funcionarioID: number | string) => {
 
 export const verifyJWT = async (token: string) => {
   try {
-    console.log(jwt.verify(token, PUBLIC_KEY, { algorithms: ['RS256'] }))
     return jwt.verify(token, PUBLIC_KEY, { algorithms: ['RS256'] });
   } catch {
+    console.log('Invalid JWT Token!')
     return null;
   }
 };
@@ -32,10 +32,7 @@ export async function comparePassword(password: string, hash: string) {
   return bcrypt.compare(password, hash);
 }
 
-
 /*
-
-
 const JWT_SECRET = process.env.JWT_SECRET
 
 export const createJWT = async (funcionarioID : number | string) => {

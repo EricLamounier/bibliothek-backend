@@ -5,7 +5,8 @@ import { deleteImages, processAndUploadImage } from '../utils/imagekit';
 import { MultipartFile } from '@fastify/multipart';
 
 export const getLivro = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { codigolivro, autor, editora, disponibilidade, situacao, token } = request.query as { codigolivro?: number[], autor?: number[], editora?: number[], disponibilidade?: string[], situacao?: string[], token?: string };
+    const { codigolivro, autor, editora, disponibilidade, situacao } = request.query as { codigolivro?: number[], autor?: number[], editora?: number[], disponibilidade?: string[], situacao?: string[] };
+    const token = request.cookies.token
     
     if(!token){
         return reply.status(401).send({ message: 'Token not found!' });
@@ -13,11 +14,10 @@ export const getLivro = async (request: FastifyRequest, reply: FastifyReply) => 
     
     const res = await verifyJWT(token);
     
-    /*if(!res){
+    if(!res){
         return reply.status(401).send({ message: 'Expired section!', data: ''});
-    }*/
+    }
     
-    console.log(codigolivro, autor, editora, disponibilidade, situacao)
     try {
         let queryLivros = `
             SELECT DISTINCT l.*

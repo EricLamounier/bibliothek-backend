@@ -7,7 +7,6 @@ export const getEmprestimo = async(request: FastifyRequest, reply: FastifyReply)
     const token = request.cookies.token;
     const { codigopessoa, livro, datainiciocriacao, datafimcriacao, datainiciodevolucao, datafimdevolucao, situacao } = request.query as { codigopessoa?: number[], livro?: number[], datainiciocriacao?: string, datafimcriacao?: string, datainiciodevolucao?: string, datafimdevolucao?: string, situacao?: string[] };
     
-    //console.log(codigopessoa, livro, datainiciocriacao, datafimcriacao, datainiciodevolucao, datafimdevolucao, situacao)
     try{
 
         if(!token){
@@ -129,6 +128,16 @@ export const getEmprestimo = async(request: FastifyRequest, reply: FastifyReply)
 export const getExisteEmprestimoAberto = async(request: FastifyRequest, reply: FastifyReply) => {
     
     const { codigopessoa } = request.query as { codigopessoa?: number | string };
+    const token = request.cookies.token;
+
+    if(!token){
+        return reply.code(401).send({ error: "Token not found!" });
+    }
+
+    const resp = await verifyJWT(token)
+    if(!resp){
+        return reply.code(401).send({ error: "Invalid JWT Token!" });
+    }
     
     let query = `
         SELECT COUNT(*) 
@@ -270,5 +279,40 @@ export const renovaEmprestimo = async(request: FastifyRequest, reply: FastifyRep
 }
 
 export const deleteEmprestimo = async(request: FastifyRequest, reply: FastifyReply) => {
+    const emprestimo = request.body as any;
+    const token = request.cookies.token;
+    console.log(request.body)
     
+    if(!token){
+        return reply.status(401).send({ message: 'Token not found!' });
+    }
+    const res = await verifyJWT(token);
+
+    if(!res){
+        return reply.status(401).send({ message: 'Expired section!', data: ''});
+    }
+
+    const funcionario = res.funcionario;
+    if(funcionario.tipopessoa !== 2 || (funcionario.privilegio && funcionario.privilegio !== 999)){
+        return reply.status(401).send({ message: 'You do not have permission to delete this emprestimo!', data: ''});
+    }
+
+    try{
+        await pool.query('BEGIN');
+        const queryLivros = "DELETE FROM EMPRESTIMO_LIVRO WHERE CODIGOEMPRESTIMO = $1 RETURNING *";
+        const dataLivros = [emprestimo.codigoemprestimo]
+        const {rows: emprestimoLivros} = await pool.query(queryLivros, dataLivros);
+        
+        const query = "DELETE FROM EMPRESTIMO WHERE CODIGOEMPRESTIMO = $1 RETURNING *";
+        const data = [emprestimo.codigoemprestimo]
+
+        const {rows} = await pool.query(query, data);
+
+        await pool.query('COMMIT');
+        return reply.status(200).send({ message: 'Emprestimo deleted successfully!', data:  'sucess' });
+    }catch(err){
+        await pool.query('ROLLBACK');
+        console.log(err)
+        return reply.status(500).send({ message: 'Emprestimo not deleted!', data: err });
+    }
 }

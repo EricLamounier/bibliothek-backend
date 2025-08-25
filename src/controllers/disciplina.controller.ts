@@ -4,6 +4,16 @@ import { verifyJWT } from '../utils/jwt';
 
 export const getDisciplina = async (request: FastifyRequest, reply: FastifyReply) => {
     const { disciplina, situacao } = request.query as { disciplina?: string | string[], situacao?: string | string[] }
+    const token = request.cookies.token;
+
+    if(!token){
+        return reply.code(401).send({ error: "Token not found!" });
+    }
+
+    const resp = await verifyJWT(token)
+    if(!resp){
+        return reply.code(401).send({ error: "Invalid JWT Token!" });
+    }
   
     //console.log(disciplina, situacao)
     let query = `
@@ -130,8 +140,6 @@ export const putDisciplina = async (request: FastifyRequest, reply: FastifyReply
 export const deleteDisciplina = async (request: FastifyRequest, reply: FastifyReply) => {
     const { disciplinas } = request.body as {disciplinas : any[]};
     const token = request.cookies.token;
-
-    //console.log(disciplinas)
 
     try{
         if(!disciplinas){

@@ -36,7 +36,17 @@ export const postEditora = async(request: FastifyRequest, reply: FastifyReply) =
 
 export const getEditora = async (request: FastifyRequest, reply: FastifyReply) => {
     const { editora, situacao } = request.query as { editora?: string | string[], situacao?: number | number[] }
-    //console.log(editora, situacao)
+    const token = request.cookies.token;
+
+    if(!token){
+        return reply.code(401).send({ error: "Token not found!" });
+    }
+
+    const resp = await verifyJWT(token)
+    if(!resp){
+        return reply.code(401).send({ error: "Invalid JWT Token!" });
+    }
+    
     let query = `
       SELECT * 
       FROM EDITORA

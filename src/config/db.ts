@@ -14,7 +14,7 @@ dotenv.config();
   connectionString: process.env.DATABASE_URL_LOCAL,
 });*/
 
-const pool = new Client(process.env.DATABASE_URL_LOCAL);
+const pool = new Client(process.env.DATABASE_URL);
 
 async function connect() {
   try {

@@ -7,7 +7,17 @@ import { MultipartFile } from '@fastify/multipart';
 
 export const getFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
     const { funcionario, privilegio, situacao } = request.query as { funcionario?: number, privilegio?: string, situacao?: string };
-    //console.log(funcionario, privilegio, situacao)
+    const token = request.cookies.token;
+
+    if(!token){
+        return reply.code(401).send({ error: "Token not found!" });
+    }
+
+    const resp = await verifyJWT(token)
+    if(!resp){
+        return reply.code(401).send({ error: "Invalid JWT Token!" });
+    }
+    
     let query = `SELECT 
                     PES.*,
                     FUN.CODIGOFUNCIONARIO,
@@ -140,6 +150,11 @@ export const putFuncionario = async (request: FastifyRequest, reply: FastifyRepl
             return reply.status(401).send({ message: 'Expired section!', data: ''});
         }
 
+        const funcionario = res.funcionario;
+        if(funcionario.tipopessoa !== 2 || (funcionario.privilegio && funcionario.privilegio !== 999)){
+            return reply.status(401).send({ message: 'You do not have permission to delete this emprestimo!', data: ''});
+        }
+
         let imagemUrl = null;
         let imageID = null;
         const queryImagem = 'SELECT IMAGEM FROM PESSOA WHERE CODIGOPESSOA = $1 LIMIT 1';
@@ -198,7 +213,17 @@ export const putFuncionario = async (request: FastifyRequest, reply: FastifyRepl
 
 export const resetSenhaFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
     const { funcionario} = request.body as {funcionario : any}; 
+    const token = request.cookies.token;
 
+    if(!token){
+        return reply.code(401).send({ error: "Token not found!" });
+    }
+
+    const resp = await verifyJWT(token)
+    if(!resp){
+        return reply.code(401).send({ error: "Invalid JWT Token!" });
+    }
+    
     try{
 
         const tempPassword = generateTempPassword()

@@ -42,6 +42,16 @@ export const postAutor = async(request: FastifyRequest, reply: FastifyReply) => 
 
 export const getAutor = async (request: FastifyRequest, reply: FastifyReply) => {
     const { autor, situacao } = request.query as { autor?: string | string[], situacao?: number | number[] }
+    const token = request.cookies.token;
+    
+    if(!token){
+        return reply.code(401).send({ error: "Token not found!" });
+    }
+
+    const resp = await verifyJWT(token)
+    if(!resp){
+        return reply.code(401).send({ error: "Invalid JWT Token!" });
+    }
   
     let query = `SELECT * FROM AUTOR`
     const conditions: string[] = []

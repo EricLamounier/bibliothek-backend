@@ -12,7 +12,6 @@ export const authLogin = async (request: FastifyRequest, reply: FastifyReply) =>
         const { email, password } = request.body as { email: string; password: string };
         const { rows } = await pool.query("SELECT FUN.*, PES.* FROM FUNCIONARIO FUN JOIN PESSOA PES ON FUN.CODIGOPESSOA = PES.CODIGOPESSOA WHERE EMAIL = $1 LIMIT 1", [email]);
 
-        //console.log(email, password)
         if (rows.length === 0) {
             return reply.code(401).send({ error: "Usuário ou senha incorretos!" });
         }
@@ -38,7 +37,7 @@ export const authLogin = async (request: FastifyRequest, reply: FastifyReply) =>
             .code(200)
             .send({ message: 'Logged successfully!', data: JWTToken});
     }catch(err){
-        //console.log(err)
+        console.log(err)
         reply.code(400).send({ message: 'Something went wrong!', data: err});
     }
 };
@@ -58,14 +57,14 @@ export const authJWT = async(request: FastifyRequest, reply: FastifyReply) => {
             FROM PESSOA PES JOIN FUNCIONARIO FUN ON PES.CODIGOPESSOA = FUN.CODIGOPESSOA
             WHERE PES.TIPOPESSOA = 2 AND FUN.CODIGOPESSOA = $1 LIMIT 1
         `
-        console.log(resp.funcionarioID)
-        const data = resp.funcionarioID.codigopessoa
+        const data = resp.funcionario.codigopessoa
         const result = await pool.query(query, [data])
         const funcionario = result.rows[0]
         const { senha, ...funcionarioFormated } = funcionario;
 
         reply.status(200).send({ message: 'Logged successfully!', data: funcionarioFormated });
     }else{
+        console.log(resp)
         reply.status(401).send({ message: 'Invalid JWT Token!' });
     }
 };
@@ -91,6 +90,17 @@ export const authRegister = async (request: FastifyRequest, reply: FastifyReply)
 export const putConta = async (request: FastifyRequest, reply: FastifyReply) => {
     try{
         const { conta: contaField, image } = request.body as { conta: { value: string }, image?: MultipartFile };
+        const token = request.cookies.token;
+
+        if(!token){
+            return reply.code(401).send({ error: "Token not found!" });
+        }
+
+        const resp = await verifyJWT(token)
+        if(!resp){
+            return reply.code(401).send({ error: "Invalid JWT Token!" });
+        }
+        
         const conta = JSON.parse(contaField.value);
         
         if(conta.novaSenha){ // Verifica se senha anterior esta correta

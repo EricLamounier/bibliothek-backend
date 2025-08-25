@@ -1,8 +1,6 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
-import bcrypt from 'bcrypt';
-import dotenv from 'dotenv';
 import pool from '../config/db';
-import { comparePassword, createJWT, hashPassword, verifyJWT } from '../utils/jwt';
+import {  hashPassword } from '../utils/jwt';
 import { generateCode, sendEmails } from '../gmail/gmail';
 import { pwdCodes } from '../utils/recuperacaoSenha';
 
@@ -11,7 +9,7 @@ export const sendOtp = async (request: FastifyRequest, reply: FastifyReply) => {
         const { email } = request.body as { email: string };
         const { rows } = await pool.query(`
             SELECT FUN.EMAIL, PES.NOME 
-            FROM FUNCIONARIO FUN JOIN PESSOA PES ON FUN.CODIGOFUNCIONARIO = PES.CODIGOPESSOA 
+            FROM FUNCIONARIO FUN JOIN PESSOA PES ON FUN.CODIGOPESSOA = PES.CODIGOPESSOA 
             WHERE EMAIL = $1 LIMIT 1
         `, [email]);
 

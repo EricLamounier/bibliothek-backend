@@ -68,7 +68,18 @@ export const postProfessor = async(request: FastifyRequest, reply: FastifyReply)
 
 export const getProfessor = async (request: FastifyRequest, reply: FastifyReply) => {
     const { codigoprofessor, situacao, disciplina } = request.query as { codigoprofessor?: number | number[], situacao?: number | number[], disciplina?: number | number[] }
-  
+    
+    const token = request.cookies.token;
+
+    if(!token){
+        return reply.code(401).send({ error: "Token not found!" });
+    }
+
+    const resp = await verifyJWT(token)
+    if(!resp){
+        return reply.code(401).send({ error: "Invalid JWT Token!" });
+    }
+    
     let query = `
       SELECT 
         PROF.*,
@@ -143,7 +154,7 @@ export const putProfessor = async (request: FastifyRequest, reply: FastifyReply)
     
     const { professor: professorField, image } = request.body as { professor: { value: string }, image?: MultipartFile };
     const professor = JSON.parse(professorField.value);
-    //console.log(professor)
+
     try{
 
         if(!token){
