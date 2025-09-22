@@ -7,7 +7,7 @@ import { MultipartFile } from '@fastify/multipart';
 export const getAluno = async (request: FastifyRequest, reply: FastifyReply) => {
     try{
         const { aluno, situacao } = request.query as { aluno?: number, situacao?: string };
-        console.log(aluno, situacao)
+        //console.log(aluno, situacao)
         let query = `
             SELECT
                 PES.*,

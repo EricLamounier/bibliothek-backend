@@ -238,7 +238,7 @@ export const resetSenhaFuncionario = async (request: FastifyRequest, reply: Fast
         const dataFuncionario = [hashedPassword, funcionario.email, funcionario.codigofuncionario];
         const {rows: [funcionarioRow]} = await pool.query(queryFuncionario, dataFuncionario);
         
-        await sendEmails(funcionarioRow.usuario, funcionarioRow.email, tempPassword, funcionarioRow.usuario);
+        await sendEmails(funcionario.nome, funcionarioRow.email, tempPassword, funcionarioRow.usuario);
 
         reply.status(200).send({ message: 'Funcionario updated successfully!', data:  funcionario});
         await pool.query('COMMIT');

@@ -4,150 +4,161 @@ import { verifyJWT } from '../utils/jwt';
 import { deleteImages, processAndUploadImage } from '../utils/imagekit';
 import { MultipartFile } from '@fastify/multipart';
 
-export const postProfessor = async(request: FastifyRequest, reply: FastifyReply) => {
-    
-    const token = request.cookies.token;
-    
-    const { professor: professorField, image } = request.body as { professor: { value: string }, image?: MultipartFile };
-    const professor = JSON.parse(professorField.value);
-    let imageUrl = null
-
-    try{
-        if(!token){
-            return reply.status(401).send({ message: 'Token not found!' });
-        }
-
-        const res = await verifyJWT(token);
-
-        if(!res){
-            return reply.status(401).send({ message: 'Expired section!', data: ''});
-        }
-
-
-        if (image) {
-            try {
-                imageUrl = await processAndUploadImage(image, '/PessoasImagens');
-            } catch (err) {
-                //console.log(err)
-                return reply.status(500).send({ message: 'Failed to upload image', error: err });
-            }
-        }
-
-        await pool.query('BEGIN');
-
-        const dataPessoa = [professor.nome, professor.contato, imageUrl, professor.observacao, 1];
-        const queryPessoa = `INSERT INTO PESSOA (NOME, CONTATO, IMAGEM, OBSERVACAO, TIPOPESSOA)
-                            VALUES ($1, $2, $3, $4, $5) RETURNING *`;
-        const {rows: [pessoaRow]} = await pool.query(queryPessoa, dataPessoa);
-
-        const queryProfessor = "INSERT INTO PROFESSOR (IDENTIFICADOR, CODIGOPESSOA) VALUES ($1, $2) RETURNING *";
-        const data = [professor.identificador, pessoaRow.codigopessoa]
-        const {rows: [professorRow]} = await pool.query(queryProfessor, data);
-
-        for(const disciplina of professor.disciplinas){
-            const queryProfessorDisciplina = "INSERT INTO PROFESSOR_DISCIPLINA (CODIGOPROFESSOR, CODIGODISCIPLINA, CODIGOPESSOA) VALUES ($1, $2, $3) RETURNING *";
-            const dataDisciplina = [professorRow.codigoprofessor, disciplina.codigodisciplina, pessoaRow.codigopessoa];
-            await pool.query(queryProfessorDisciplina, dataDisciplina);
-        }
-
-        await pool.query('COMMIT');
-
-        const createdData = {
-            ...professorRow,
-            disciplinas: professor.disciplinas,
-            ...pessoaRow
-        }
- 
-        reply.status(200).send({ message: 'Professor inserted successfully!', data:  createdData});
-    }catch(err){
-        await pool.query('ROLLBACK');
-        //console.log(err)
-        reply.status(500).send({ message: 'Professor not inserted!', data: err });
-    }
-};
-
 export const getProfessor = async (request: FastifyRequest, reply: FastifyReply) => {
     const { codigoprofessor, situacao, disciplina } = request.query as { codigoprofessor?: number | number[], situacao?: number | number[], disciplina?: number | number[] }
     
     const token = request.cookies.token;
+    try{
+        if(!token){
+            return reply.code(401).send({ error: "Token not found!" });
+        }
 
-    if(!token){
-        return reply.code(401).send({ error: "Token not found!" });
-    }
+        const resp = await verifyJWT(token)
+        if(!resp){
+            return reply.code(401).send({ error: "Invalid JWT Token!" });
+        }
+        
+        let query = `
+        SELECT 
+            PROF.*,
+            PES.*,
+            0 AS sync,
+            COALESCE(
+            JSON_AGG(DISTINCT to_jsonb(D)) FILTER (WHERE D.CODIGODISCIPLINA IS NOT NULL),
+            '[]'
+            ) AS disciplinas
+        FROM PESSOA PES
+        JOIN PROFESSOR PROF ON PES.CODIGOPESSOA = PROF.CODIGOPESSOA
+        LEFT JOIN PROFESSOR_DISCIPLINA PD ON PROF.CODIGOPROFESSOR = PD.CODIGOPROFESSOR
+        LEFT JOIN DISCIPLINA D ON PD.CODIGODISCIPLINA = D.CODIGODISCIPLINA
+        `
+        const conditions: string[] = []
+        const values: any[] = []
+        let paramIndex = 1
 
-    const resp = await verifyJWT(token)
-    if(!resp){
-        return reply.code(401).send({ error: "Invalid JWT Token!" });
-    }
+        if (codigoprofessor) {
+        const codigos = Array.isArray(codigoprofessor) ? codigoprofessor : [codigoprofessor]
+        const placeholders = codigos.map((_, i) => `$${paramIndex + i}`)
+        conditions.push(`PROF.CODIGOPESSOA IN (${placeholders.join(',')})`)
+        values.push(...codigos)
+        paramIndex += codigos.length
+        }
     
-    let query = `
-      SELECT 
-        PROF.*,
-        PES.*,
-        COALESCE(
-          JSON_AGG(DISTINCT to_jsonb(D)) FILTER (WHERE D.CODIGODISCIPLINA IS NOT NULL),
-          '[]'
-        ) AS disciplinas
-      FROM PESSOA PES
-      JOIN PROFESSOR PROF ON PES.CODIGOPESSOA = PROF.CODIGOPESSOA
-      LEFT JOIN PROFESSOR_DISCIPLINA PD ON PROF.CODIGOPROFESSOR = PD.CODIGOPROFESSOR
-      LEFT JOIN DISCIPLINA D ON PD.CODIGODISCIPLINA = D.CODIGODISCIPLINA
-    `
-    const conditions: string[] = []
-    const values: any[] = []
-    let paramIndex = 1
+        // filtro por situação
+        if (situacao) {
+        const situacoes = Array.isArray(situacao) ? situacao : [situacao]
+        const placeholders = situacoes.map((_, i) => `$${paramIndex + i}`)
+        conditions.push(`PES.SITUACAO IN (${placeholders.join(',')})`)
+        values.push(...situacoes.map(Number))
+        paramIndex += situacoes.length
+        }
+    
+        // filtro por disciplina
+        if (disciplina) {
 
-    if (codigoprofessor) {
-      const codigos = Array.isArray(codigoprofessor) ? codigoprofessor : [codigoprofessor]
-      const placeholders = codigos.map((_, i) => `$${paramIndex + i}`)
-      conditions.push(`PROF.CODIGOPESSOA IN (${placeholders.join(',')})`)
-      values.push(...codigos)
-      paramIndex += codigos.length
+        const disciplinas = Array.isArray(disciplina) ? disciplina : [disciplina]
+        //console.log(disciplinas)
+        const placeholders = disciplinas.map((_, i) => `$${paramIndex + i}`)
+        conditions.push(`D.CODIGODISCIPLINA IN (${placeholders.join(',')})`)
+        values.push(...disciplinas)
+        paramIndex += disciplinas.length
+        }
+    
+        // monta WHERE com TIPOPESSOA fixo
+        if (conditions.length > 0) {
+        query += ' WHERE ' + conditions.join(' AND ') + ' AND PES.TIPOPESSOA = 1'
+        } else {
+        query += ' WHERE PES.TIPOPESSOA = 1'
+        }
+    
+        query += `
+        GROUP BY 
+            PES.CODIGOPESSOA, 
+            PES.NOME, 
+            PES.CONTATO, 
+            PROF.CODIGOPROFESSOR
+        `
+        
+        const { rows } = await pool.query(query, values)
+        reply.status(200).send({ message: 'Professors fetched successfully!', data: rows });
+    }catch(err){
+        console.log(err)
+        reply.status(400).send({ message: 'Professors not fetched!', data: err });
     }
-  
-    // filtro por situação
-    if (situacao) {
-      const situacoes = Array.isArray(situacao) ? situacao : [situacao]
-      const placeholders = situacoes.map((_, i) => `$${paramIndex + i}`)
-      conditions.push(`PES.SITUACAO IN (${placeholders.join(',')})`)
-      values.push(...situacoes.map(Number))
-      paramIndex += situacoes.length
-    }
-  
-    // filtro por disciplina
-    if (disciplina) {
-
-      const disciplinas = Array.isArray(disciplina) ? disciplina : [disciplina]
-      //console.log(disciplinas)
-      const placeholders = disciplinas.map((_, i) => `$${paramIndex + i}`)
-      conditions.push(`D.CODIGODISCIPLINA IN (${placeholders.join(',')})`)
-      values.push(...disciplinas)
-      paramIndex += disciplinas.length
-    }
-  
-    // monta WHERE com TIPOPESSOA fixo
-    if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ') + ' AND PES.TIPOPESSOA = 1'
-    } else {
-      query += ' WHERE PES.TIPOPESSOA = 1'
-    }
-  
-    query += `
-      GROUP BY 
-        PES.CODIGOPESSOA, 
-        PES.NOME, 
-        PES.CONTATO, 
-        PROF.CODIGOPROFESSOR
-    `
-  
-    //console.log(codigoprofessor, situacao, disciplina) // debug seguro
-  
-    const { rows } = await pool.query(query, values)
-    //console.log(rows)
-  
-    reply.status(200).send({ message: 'Professors fetched successfully!', data: rows })
 }
+
+export const postProfessor = async (request: FastifyRequest, reply: FastifyReply) => {
+    const token = request.cookies.token;
   
+    // request.body agora é um array de formData
+    const formData = request.body as { professor: { value: string }, image?: MultipartFile };
+  
+    if (!token) {
+      return reply.status(401).send({ message: 'Token not found!' });
+    }
+  
+    const res = await verifyJWT(token);
+    if (!res) {
+      return reply.status(401).send({ message: 'Expired session!', data: '' });
+    }
+  
+    try {
+        await pool.query('BEGIN');
+
+        const { professor: professorField, image } = formData;
+        const professor = JSON.parse(professorField.value);
+        let imageUrl: string | null = null;
+
+        if (image) {
+            try {
+            imageUrl = await processAndUploadImage(image, '/PessoasImagens');
+            } catch (err) {
+            await pool.query('ROLLBACK');
+            return reply.status(500).send({ message: 'Failed to upload image', error: err });
+            }
+        }
+
+        // Inserção em PESSOA
+        const dataPessoa = [professor.nome, professor.contato, imageUrl, professor.observacao, 1];
+        const queryPessoa = `INSERT INTO PESSOA (NOME, CONTATO, IMAGEM, OBSERVACAO, TIPOPESSOA)
+                                VALUES ($1, $2, $3, $4, $5) RETURNING *`;
+        const { rows: [pessoaRow] } = await pool.query(queryPessoa, dataPessoa);
+
+        // Inserção em PROFESSOR
+        const queryProfessor = "INSERT INTO PROFESSOR (IDENTIFICADOR, CODIGOPESSOA) VALUES ($1, $2) RETURNING *";
+        const dataProfessor = [professor.identificador, pessoaRow.codigopessoa];
+        const { rows: [professorRow] } = await pool.query(queryProfessor, dataProfessor);
+
+        // Inserção em PROFESSOR_DISCIPLINA
+        for (const disciplina of professor.disciplinas) {
+            const queryProfessorDisciplina = `
+            INSERT INTO PROFESSOR_DISCIPLINA (CODIGOPROFESSOR, CODIGODISCIPLINA, CODIGOPESSOA) 
+            VALUES ($1, $2, $3) RETURNING *`;
+            const dataDisciplina = [professorRow.codigoprofessor, disciplina.codigodisciplina, pessoaRow.codigopessoa];
+            await pool.query(queryProfessorDisciplina, dataDisciplina);
+            disciplina.sync = 0;
+        }
+
+        const results = {
+            ...professorRow,
+            disciplinas: professor.disciplinas,
+            ...pessoaRow,
+            sync: 0,
+        };
+
+        await pool.query('COMMIT');
+
+        reply.status(200).send({
+        message: 'Professor inserted successfully!',
+        data: results,
+    });
+  
+    } catch (err) {
+      console.log(err)
+      await pool.query('ROLLBACK');
+      reply.status(500).send({ message: 'Erro ao inserir professores!', data: err });
+    }
+  };  
 
 export const putProfessor = async (request: FastifyRequest, reply: FastifyReply) => {
     const token = request.cookies.token;
@@ -205,6 +216,8 @@ export const putProfessor = async (request: FastifyRequest, reply: FastifyReply)
         const dataProfessor = [professor.identificador, professor.codigoprofessor];
         await pool.query(queryProfessor, dataProfessor);
 
+        let disciplinas = professor.disciplinas.filter((d: any) => d.sync === 0)
+
         // Update author relationships
         if (professor.disciplinas && professor.disciplinas.length > 0) {
             const queryInsertDisciplinaProfessor = `
@@ -217,14 +230,18 @@ export const putProfessor = async (request: FastifyRequest, reply: FastifyReply)
             `;
 
             for (const disciplina of professor.disciplinas) {
-
-                // Insere novo autor
+                // Insere nova disciplina
                 if(disciplina.sync === 1){
-                    await pool.query(queryInsertDisciplinaProfessor, [professor.codigopessoa, professor.codigoprofessor, disciplina.codigodisciplina]);
+                    const newDisciplina = await pool.query(queryInsertDisciplinaProfessor, [professor.codigopessoa, professor.codigoprofessor, disciplina.codigodisciplina]);
+                    disciplinas.push({
+                        ...disciplina,
+                        sync: 0,
+                        codigodisciplinatemp: disciplina.codigodisciplina
+                    });
                 }
 
-                // Exclui autor
-                if(disciplina.sync === 2){
+                // Exclui disciplina
+                if(disciplina.sync === 3){
                     await pool.query(queryDeleteDisciplinaProfessor, [professor.codigopessoa, disciplina.codigodisciplina]);
                 }
             }
@@ -233,27 +250,28 @@ export const putProfessor = async (request: FastifyRequest, reply: FastifyReply)
         const updatedProfessor = {
             ...professor,
             imagem: imagemUrl,
-            disciplinas: professor.disciplinas = professor.disciplinas
-                .filter((disciplina: any) => disciplina.sync !== 2)
-                .map((disciplina: any) => ({ ...disciplina, sync: 0 })),
+            disciplinas: disciplinas,
+            sync: 0,
         }
+
+        console.log(updatedProfessor)
 
         await pool.query('COMMIT');
 
         reply.status(200).send({ message: 'Professor updated successfully!', data: updatedProfessor});
     }catch(err){
+        console.log(err)
         await pool.query('ROLLBACK');
-        //console.log(err)
         reply.status(500).send({ message: 'Professor not updated!', data: err });
     }
 };
 
 export const deleteProfessor = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { codigopessoa } = request.query as {codigopessoa : number};
+    const { professor } = request.body as {professor : any};
     const token = request.cookies.token;
 
     try{
-        if(!codigopessoa){
+        if(!professor){
             return reply.status(400).send({ message: "Professor's ID required!" })
         }
 
@@ -269,11 +287,11 @@ export const deleteProfessor = async (request: FastifyRequest, reply: FastifyRep
 
         await pool.query('BEGIN');
 
-        const data = [codigopessoa];
+        const data = [professor.codigopessoa];
 
-        const queryProfessorDisciplina = "DELETE FROM PROFESSOR_DISCIPLINA WHERE CODIGOPESSOA = $1";
-        const queryProfessor = 'DELETE FROM PROFESSOR WHERE CODIGOPESSOA = $1';
-        const queryPessoa = 'DELETE FROM PESSOA WHERE CODIGOPESSOA = $1';
+        const queryProfessorDisciplina = `DELETE FROM PROFESSOR_DISCIPLINA WHERE CODIGOPESSOA = $1`;
+        const queryProfessor = `DELETE FROM PROFESSOR WHERE CODIGOPESSOA = $1`;
+        const queryPessoa = `DELETE FROM PESSOA WHERE CODIGOPESSOA = $1`;
         
         await pool.query(queryProfessorDisciplina, data);
         await pool.query(queryProfessor, data);
@@ -281,10 +299,10 @@ export const deleteProfessor = async (request: FastifyRequest, reply: FastifyRep
 
         await pool.query('COMMIT');
 
-        reply.status(200).send({ message: 'Professor deleted successfully!', data:  []});
+        reply.status(200).send({ message: 'Professor deleted successfully!', data:  professor});
     }catch(err){
         await pool.query('ROLLBACK');
-        //console.log(err)
+        console.log(err)
         reply.status(500).send({ message: 'Professor not deleted!', data: err });
     }
 };

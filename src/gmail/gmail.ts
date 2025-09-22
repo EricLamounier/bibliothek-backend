@@ -33,12 +33,12 @@ export const sendEmails = async(name: any, email: any, code: string, text: strin
 	});
 
 	if(!text){
-		text = `Hey, ${name}! Aqui está sua senha de acesso temporária. Não compartilhe com ninguém, ok?`;
+		text = `Hey${name ? `, ${name}` : ''}! Aqui está sua senha de acesso temporária. Não compartilhe com ninguém, ok?`;
 	}
 	
 	const recipientData = {
 		verificationCode: code,
-		name: email,
+		name: name ? name : '',
 	};
 
 	const renderedHtml = renderTemplate(emailTemplate, recipientData, text);
