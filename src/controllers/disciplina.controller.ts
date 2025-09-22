@@ -75,16 +75,14 @@ export const postDisciplina = async(request: FastifyRequest, reply: FastifyReply
             return reply.status(401).send({ message: 'Expired section!', data: ''});
         }
 
-        let rows = [];
         await pool.query('BEGIN');
         const query = "INSERT INTO DISCIPLINA (NOME, OBSERVACAO) VALUES ($1, $2) RETURNING *";
         const data = [disciplina.nome, disciplina.observacao];
         const { rows: result } = await pool.query(query, data);
         result[0].sync = 0;
         result[0].codigodisciplinatemp = disciplina.codigodisciplina
-        rows.push(result[0]);
          
-        reply.status(200).send({ message: 'Disciplina inserted successfully!', data:  rows });    
+        reply.status(200).send({ message: 'Disciplina inserted successfully!', data:  result[0] });    
         
         await pool.query('COMMIT');
     }catch(err){
@@ -122,7 +120,7 @@ export const putDisciplina = async (request: FastifyRequest, reply: FastifyReply
         result[0].sync = 0;
         await pool.query('COMMIT');
 
-        reply.status(200).send({ message: 'Disciplina updated successfully!', data:  result });
+        reply.status(200).send({ message: 'Disciplina updated successfully!', data:  result[0] });
 
     }catch(err){
         await pool.query('ROLLBACK');
@@ -154,7 +152,6 @@ export const deleteDisciplina = async (request: FastifyRequest, reply: FastifyRe
         const query = `DELETE FROM DISCIPLINA WHERE CODIGODISCIPLINA IN ($1)`;
         await pool.query(query, [disciplina.codigodisciplina]);
         await pool.query('COMMIT');
-        console.log(disciplina)
 
         reply.status(200).send({ message: 'Disciplina deleted successfully!', data:  'sucess'});
     }catch(err){
