@@ -90,6 +90,11 @@ export const postFuncionario = async(request: FastifyRequest, reply: FastifyRepl
             return reply.status(401).send({ message: 'Expired section!', data: ''});
         }
 
+        const funcionarioRequest = res.funcionario;
+        if(funcionarioRequest.tipopessoa !== 2 || (funcionarioRequest.privilegio && Number(funcionarioRequest.privilegio !== 999))){
+            return reply.status(401).send({ message: 'Funcionário sem privilégio para criar outros funcionários!', data: ''});
+        }
+
         if (image) {
             try {
                 imageUrl = await processAndUploadImage(image, '/PessoasImagens');
@@ -152,10 +157,8 @@ export const putFuncionario = async (request: FastifyRequest, reply: FastifyRepl
         }
 
         const funcionarioRequest = res.funcionario;
-        console.log(funcionarioRequest)
-        console.log(res)
-        if(funcionarioRequest.tipopessoa !== 2 || (funcionarioRequest.privilegio && funcionarioRequest.privilegio !== 999)){
-            return reply.status(401).send({ message: 'You do not have permission to delete this emprestimo!', data: ''});
+        if(funcionarioRequest.tipopessoa !== 2 || (funcionarioRequest.privilegio && Number(funcionarioRequest.privilegio !== 999))){
+            return reply.status(401).send({ message: 'Funcionário sem privilégio para editar outros funcionários!', data: ''});
         }
 
         let imagemUrl = null;
@@ -268,6 +271,11 @@ export const deleteFuncionario = async (request: FastifyRequest, reply: FastifyR
 
         if(!res){
             return reply.status(401).send({ message: 'Expired section!', data: ''});
+        }
+
+        const funcionarioRequest = res.funcionario;
+        if(funcionarioRequest.tipopessoa !== 2 || (funcionarioRequest.privilegio && Number(funcionarioRequest.privilegio !== 999))){
+            return reply.status(401).send({ message: 'Funcionário sem privilégio para excluir outros funcionários!', data: ''});
         }
 
         await pool.query('BEGIN');
