@@ -152,6 +152,8 @@ export const putFuncionario = async (request: FastifyRequest, reply: FastifyRepl
         }
 
         const funcionarioRequest = res.funcionario;
+        console.log(funcionarioRequest)
+        console.log(res)
         if(funcionarioRequest.tipopessoa !== 2 || (funcionarioRequest.privilegio && funcionarioRequest.privilegio !== 999)){
             return reply.status(401).send({ message: 'You do not have permission to delete this emprestimo!', data: ''});
         }
