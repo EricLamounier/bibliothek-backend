@@ -77,6 +77,7 @@ export const resetPassword = async (request: FastifyRequest, reply: FastifyReply
 
         reply.status(200).send({ message: 'Senha resetada com sucesso!' });
     } catch (err) {
+        await pool.query('ROLLBACK');
         reply.code(400).send({ message: "Something went wrong!", data: err });
     }
 };

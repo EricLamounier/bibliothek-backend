@@ -69,10 +69,18 @@ export const authJWT = async(request: FastifyRequest, reply: FastifyReply) => {
     }
 };
 
-export const logout = async(request: FastifyRequest, reply: FastifyReply) => {
-    reply.clearCookie('token', { path: '/' })
-    .code(200).send({ message: 'Logout realizado com sucesso!' });
-};
+export const logout = async (request: FastifyRequest, reply: FastifyReply) => {
+    reply
+      .clearCookie('token', {
+        httpOnly: true,
+        secure: true,          // igual ao que foi setado no login
+        sameSite: 'none',      // igual ao que foi setado no login
+        path: '/',             // igual ao que foi setado no login
+        expires: new Date(0), // data no passado
+      })
+      .code(200)
+      .send({ message: 'Logout realizado com sucesso!' });
+  };
 
 export const authRegister = async (request: FastifyRequest, reply: FastifyReply) => {
 

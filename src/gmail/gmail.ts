@@ -27,13 +27,13 @@ export const sendEmails = async(name: any, email: any, code: string, text: strin
 	const transporter = nodemailer.createTransport({
 		service: 'gmail',
 		auth: {
-		  user: 'cepf.bibliothek@gmail.com',
-		  pass: 'owngvvmhkwhvwbhz',
+		  user: process.env.GMAIL_EMAIL,
+		  pass: process.env.GMAIL_PASSWORD,
 		},
 	});
 
 	if(!text){
-		text = `Hey${name ? `, ${name}` : ''}! Aqui está sua senha de acesso temporária. Não compartilhe com ninguém, ok?`;
+		text = `Hey${name ? `, ${name}` : ''}! Aqui está sua senha de acesso temporário. Não compartilhe com ninguém, ok?`;
 	}
 	
 	const recipientData = {

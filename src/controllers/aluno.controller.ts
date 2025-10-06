@@ -7,7 +7,6 @@ import { MultipartFile } from '@fastify/multipart';
 export const getAluno = async (request: FastifyRequest, reply: FastifyReply) => {
     try{
         const { aluno, situacao } = request.query as { aluno?: number, situacao?: string };
-        //console.log(aluno, situacao)
         let query = `
             SELECT
                 PES.*,
@@ -80,7 +79,6 @@ export const postAluno = async(request: FastifyRequest, reply: FastifyReply) => 
             try {
                 imageUrl = await processAndUploadImage(image, '/PessoasImagens');
             } catch (err) {
-                //console.log(err)
                 return reply.status(500).send({ message: 'Failed to upload image', error: err });
             }
         }
@@ -100,12 +98,14 @@ export const postAluno = async(request: FastifyRequest, reply: FastifyReply) => 
 
         const createdData = {
             ...pessoaRow,
-            ...alunoRow
+            ...alunoRow,
+            sync: 0,
+            codigopessoatemp: aluno.codigopessoa,
         }
  
         reply.status(200).send({ message: 'Aluno inserted successfully!', data:  createdData});
     }catch(err : any){
-        //console.log(err)
+        await pool.query('ROLLBACK');
         imageUrl && await deleteImages([imageUrl])
         reply.status(500).send({ message: 'Aluno not inserted!', data: err, errorMessage: err?.message });
     }
@@ -174,24 +174,25 @@ export const putAluno = async (request: FastifyRequest, reply: FastifyReply) => 
 
         const updatedAluno = {
             ...aluno,
-            imagem: imagemUrl
+            imagem: imagemUrl,
+            sync: 0,
         }
 
         await pool.query('COMMIT');
 
         reply.status(200).send({ message: 'Aluno updated successfully!', data:  updatedAluno});
     }catch(err : any){
-        //console.log(err)
+        await pool.query('ROLLBACK');
         reply.status(500).send({ message: 'Aluno not updated!', data: err, errorMessage: err?.message });
     }
 };
 
 export const deleteAluno = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { codigopessoa } = request.query as {codigopessoa : number};
+    const { aluno } = request.body as any;
     const token = request.cookies.token;
 
     try{
-        if(!codigopessoa){
+        if(!aluno){
             return reply.status(400).send({ message: "Aluno's ID required!" })
         }
 
@@ -207,7 +208,7 @@ export const deleteAluno = async (request: FastifyRequest, reply: FastifyReply) 
 
         await pool.query('BEGIN');
 
-        const data = [codigopessoa];
+        const data = [aluno.codigopessoa];
 
         const queryImagem = 'SELECT IMAGEM FROM PESSOA WHERE CODIGOPESSOA = $1 LIMIT 1';
         const { rows: [imagemId] } = await pool.query(queryImagem, data);
@@ -222,8 +223,9 @@ export const deleteAluno = async (request: FastifyRequest, reply: FastifyReply) 
 
         await pool.query('COMMIT');
 
-        reply.status(200).send({ message: 'Aluno deleted successfully!', data:  codigopessoa});
+        reply.status(200).send({ message: 'Aluno deleted successfully!', data:  aluno});
     }catch(err : any){
-        reply.status(200).send({ message: 'Aluno not deleted!', data: err, errorMessage: err?.message });
+        await pool.query('ROLLBACK');
+        reply.status(400).send({ message: 'Aluno not deleted!', data: err, errorMessage: err?.message });
     }
 };

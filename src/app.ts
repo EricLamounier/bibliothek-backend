@@ -17,16 +17,13 @@ import emprestimoRoutes from './routes/emprestimo.route';
 import resetPasswordRoute from './routes/resetPassword.route';
 import fs from 'fs';
 
-const httpsOptions = {
-  key: fs.readFileSync('./localhost-key.pem'),
-  cert: fs.readFileSync('./localhost.pem')
-};
+
 
 const app = Fastify({
   logger: {
     level: 'warn', // Apenas logs de warning ou erro
   },
-  https: httpsOptions
+  //https: httpsOptions
 });
 
 app.register(formbody);

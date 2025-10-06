@@ -79,10 +79,14 @@ export const postDisciplina = async(request: FastifyRequest, reply: FastifyReply
         const query = "INSERT INTO DISCIPLINA (NOME, OBSERVACAO) VALUES ($1, $2) RETURNING *";
         const data = [disciplina.nome, disciplina.observacao];
         const { rows: result } = await pool.query(query, data);
-        result[0].sync = 0;
-        result[0].codigodisciplinatemp = disciplina.codigodisciplina
+        
+        const novaDisciplina = {
+            ...result[0],
+            sync: 0,
+            codigodisciplinatemp: disciplina.codigodisciplina
+        }
          
-        reply.status(200).send({ message: 'Disciplina inserted successfully!', data:  result[0] });    
+        reply.status(200).send({ message: 'Disciplina inserted successfully!', data:  novaDisciplina });    
         
         await pool.query('COMMIT');
     }catch(err){
@@ -117,10 +121,14 @@ export const putDisciplina = async (request: FastifyRequest, reply: FastifyReply
         const data = [nome, observacao, situacao, codigodisciplina];
         const query = 'UPDATE DISCIPLINA SET NOME = $1, OBSERVACAO = $2, SITUACAO = $3 WHERE CODIGODISCIPLINA = $4 RETURNING *';
         const { rows: result } = await pool.query(query, data);
-        result[0].sync = 0;
+        
+        const novaDisciplina = {
+            ...result[0],
+            sync: 0,
+        }
         await pool.query('COMMIT');
 
-        reply.status(200).send({ message: 'Disciplina updated successfully!', data:  result[0] });
+        reply.status(200).send({ message: 'Disciplina updated successfully!', data:  novaDisciplina });
 
     }catch(err){
         await pool.query('ROLLBACK');

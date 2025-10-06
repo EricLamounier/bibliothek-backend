@@ -162,7 +162,7 @@ export const getExisteEmprestimoAberto = async(request: FastifyRequest, reply: F
 
 export const postEmprestimo = async(request: FastifyRequest, reply: FastifyReply) => {
     
-    const { emprestimo } = request.body as {emprestimo : any};
+    const emprestimo = request.body as any;
     const token = request.cookies.token;
     console.log(emprestimo)
 
@@ -189,15 +189,17 @@ export const postEmprestimo = async(request: FastifyRequest, reply: FastifyReply
         const livros = emprestimo.livros;
 
         for (const livro of livros) {
-            const queryLivros = "INSERT INTO EMPRESTIMO_LIVRO (CODIGOEMPRESTIMO, CODIGOLIVRO, QUANTIDADEEMPRESTADA) VALUES ($1, $2, $3) RETURNING *";
-            const dataLivros = [newEmprestimo[0].codigoemprestimo, livro.codigolivro, livro.quantidade]
+            const queryLivros = "INSERT INTO EMPRESTIMO_LIVRO (CODIGOEMPRESTIMO, CODIGOLIVRO, QUANTIDADEEMPRESTADA, QUANTIDADEDEVOLVIDA) VALUES ($1, $2, $3, $4) RETURNING *";
+            const dataLivros = [newEmprestimo[0].codigoemprestimo, livro.codigolivro, livro.quantidadeemprestada, livro.quantidadedevolvida]
             await pool.query(queryLivros, dataLivros);
         }
 
         await pool.query('COMMIT');
         const formtedEmprestimo = {
             ...emprestimo,
-            ...newEmprestimo[0]
+            ...newEmprestimo[0],
+            codigoemprestimotemp: emprestimo.codigoemprestimo,
+            sync: 0,
         }
  
         reply.status(200).send({ message: 'Emprestimo inserted successfully!', data:  formtedEmprestimo});
@@ -206,7 +208,6 @@ export const postEmprestimo = async(request: FastifyRequest, reply: FastifyReply
         console.log(err)
         reply.status(500).send({ message: 'Emprestimo not inserted!', data: err });
     }
-    
 }
 
 export const devolveEmprestimo = async(request: FastifyRequest, reply: FastifyReply) => {
@@ -279,9 +280,8 @@ export const renovaEmprestimo = async(request: FastifyRequest, reply: FastifyRep
 }
 
 export const deleteEmprestimo = async(request: FastifyRequest, reply: FastifyReply) => {
-    const emprestimo = request.body as any;
+    const {emprestimo} = request.body as any;
     const token = request.cookies.token;
-    console.log(request.body)
     
     if(!token){
         return reply.status(401).send({ message: 'Token not found!' });
@@ -294,7 +294,7 @@ export const deleteEmprestimo = async(request: FastifyRequest, reply: FastifyRep
 
     const funcionario = res.funcionario;
     if(funcionario.tipopessoa !== 2 || (funcionario.privilegio && funcionario.privilegio !== 999)){
-        return reply.status(401).send({ message: 'You do not have permission to delete this emprestimo!', data: ''});
+        return reply.status(401).send({ message: 'Você não tem permissão para deletar este emprestimo!', data: ''});
     }
 
     try{

@@ -141,6 +141,7 @@ export const postProfessor = async (request: FastifyRequest, reply: FastifyReply
 
         const results = {
             ...professorRow,
+            codigopessoatemp: professor.codigopessoa,
             disciplinas: professor.disciplinas,
             ...pessoaRow,
             sync: 0,
@@ -253,9 +254,6 @@ export const putProfessor = async (request: FastifyRequest, reply: FastifyReply)
             disciplinas: disciplinas,
             sync: 0,
         }
-
-        console.log(updatedProfessor)
-
         await pool.query('COMMIT');
 
         reply.status(200).send({ message: 'Professor updated successfully!', data: updatedProfessor});

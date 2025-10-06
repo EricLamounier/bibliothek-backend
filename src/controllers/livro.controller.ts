@@ -20,8 +20,9 @@ export const getLivro = async (request: FastifyRequest, reply: FastifyReply) => 
     
     try {
         let queryLivros = `
-            SELECT DISTINCT l.*
+            SELECT DISTINCT l.*, e.NOME AS NOMEEDITORA
             FROM LIVRO l
+            JOIN EDITORA e ON l.CODIGOEDITORA = e.CODIGOEDITORA
         `;
         
         if (autor) {
@@ -200,7 +201,9 @@ export const postLivro = async(request: FastifyRequest, reply: FastifyReply) => 
             localizacao: insertedBook.localizacao,
             observacao: insertedBook.observacao,
             situacao: insertedBook.situacao || 0,
-            imagem: imageUrl
+            imagem: imageUrl,
+            sync: 0,
+            codigolivrotemp: livro.codigolivro
         };
 
         await pool.query('COMMIT');
@@ -208,7 +211,7 @@ export const postLivro = async(request: FastifyRequest, reply: FastifyReply) => 
 
     } catch(err : any) {
         await pool.query('ROLLBACK');
-        //console.log(err)
+        console.log(err)
         imageUrl && await deleteImages([imageUrl])
         reply.status(500).send({ message: 'Livro not inserted!', data: err, errorMessage: err?.message });
     }
@@ -288,7 +291,7 @@ export const putLivro = async (request: FastifyRequest, reply: FastifyReply) => 
                 OBSERVACAO = $6,
                 CODIGOEDITORA = $7,
                 SITUACAO = $8,
-                IMAGEM = COALESCE($9, IMAGEM)             
+                IMAGEM = COALESCE($9, IMAGEM)
             WHERE CODIGOLIVRO = $10
             RETURNING *
         `;
@@ -325,7 +328,8 @@ export const putLivro = async (request: FastifyRequest, reply: FastifyReply) => 
             autores: livro.autores = livro.autores
                 .filter((autor: any) => autor.sync !== 2)
                 .map((autor: any) => ({ ...autor, sync: 0 })),
-            imagem: imagemUrl
+            imagem: imagemUrl,
+            sync: 0,
         }
 
         await pool.query('COMMIT');
@@ -339,11 +343,11 @@ export const putLivro = async (request: FastifyRequest, reply: FastifyReply) => 
 };
 
 export const deleteLivro = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { codigolivro } = request.body as {codigolivro : number[]};
+    const { livro } = request.body as any;
     const token = request.cookies.token;
 
     try{
-        if(!codigolivro){
+        if(!livro){
             return reply.status(400).send({ message: "Livro's ID required!" })
         }
 
@@ -358,17 +362,16 @@ export const deleteLivro = async (request: FastifyRequest, reply: FastifyReply) 
         }
 
         await pool.query('BEGIN');
-        const placeholders = codigolivro.map((_, index) => `$${index + 1}`).join(", ");
 
-        const data = codigolivro;
+        const data = [livro.codigolivro];
 
-        const queryImagem = `SELECT IMAGEM FROM LIVRO WHERE CODIGOLIVRO IN (${placeholders})`;
+        const queryImagem = `SELECT IMAGEM FROM LIVRO WHERE CODIGOLIVRO IN ($1)`;
         const { rows } = await pool.query(queryImagem, data);
 
-        const queryLivroAutor = `DELETE FROM LIVRO_AUTOR WHERE CODIGOLIVRO IN (${placeholders})`;
+        const queryLivroAutor = `DELETE FROM LIVRO_AUTOR WHERE CODIGOLIVRO IN ($1)`;
         await pool.query(queryLivroAutor, data);
 
-        const queryLivro = `DELETE FROM LIVRO WHERE CODIGOLIVRO IN (${placeholders})`;
+        const queryLivro = `DELETE FROM LIVRO WHERE CODIGOLIVRO IN ($1)`;
         await pool.query(queryLivro, data);        
 
         await pool.query('COMMIT');

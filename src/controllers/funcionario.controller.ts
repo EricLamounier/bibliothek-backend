@@ -126,7 +126,7 @@ export const postFuncionario = async(request: FastifyRequest, reply: FastifyRepl
  
         reply.status(200).send({ message: 'Funcionario inserted successfully!', data:  formatedFuncionario});
     }catch(err : any){
-        //console.log(err)
+        await pool.query('ROLLBACK');
         imageUrl && await deleteImages([imageUrl])
         reply.status(500).send({ message: 'Funcionario not inserted!', data: err, errorMessage: err?.message });
     }
@@ -137,6 +137,7 @@ export const putFuncionario = async (request: FastifyRequest, reply: FastifyRepl
 
     const { funcionario: funcionarioField, image } = request.body as { funcionario: { value: string }, image?: MultipartFile };
     const funcionario = JSON.parse(funcionarioField.value);
+    console.log(funcionario)
 
     try{
 
@@ -150,8 +151,8 @@ export const putFuncionario = async (request: FastifyRequest, reply: FastifyRepl
             return reply.status(401).send({ message: 'Expired section!', data: ''});
         }
 
-        const funcionario = res.funcionario;
-        if(funcionario.tipopessoa !== 2 || (funcionario.privilegio && funcionario.privilegio !== 999)){
+        const funcionarioRequest = res.funcionario;
+        if(funcionarioRequest.tipopessoa !== 2 || (funcionarioRequest.privilegio && funcionarioRequest.privilegio !== 999)){
             return reply.status(401).send({ message: 'You do not have permission to delete this emprestimo!', data: ''});
         }
 
@@ -206,7 +207,7 @@ export const putFuncionario = async (request: FastifyRequest, reply: FastifyRepl
 
         reply.status(200).send({ message: 'Funcionario updated successfully!', data:  updatedFuncionario});
     }catch(err : any){
-        console.log(err)
+        await pool.query('ROLLBACK');
         reply.status(500).send({ message: 'Funcionario not updated!', data: err, errorMessage: err?.message });
     }
 };
