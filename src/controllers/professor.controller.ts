@@ -18,57 +18,77 @@ export const getProfessor = async (request: FastifyRequest, reply: FastifyReply)
             return reply.code(401).send({ error: "Invalid JWT Token!" });
         }
         
-        let query = `
+        let query0 = `
         SELECT 
             PROF.*,
             PES.*,
             0 AS sync,
             COALESCE(
-            JSON_AGG(DISTINCT to_jsonb(D)) FILTER (WHERE D.CODIGODISCIPLINA IS NOT NULL),
-            '[]'
+                PES.CODIGOPESSOA AS CODIGOPESSOA,
+                PROF.CODIGOPROFESSOR AS CODIGOPROFESSOR,
+                JSON_AGG(DISTINCT to_jsonb(D)) FILTER (WHERE D.CODIGODISCIPLINA IS NOT NULL),
+                '[]'
             ) AS disciplinas
         FROM PESSOA PES
         JOIN PROFESSOR PROF ON PES.CODIGOPESSOA = PROF.CODIGOPESSOA
         LEFT JOIN PROFESSOR_DISCIPLINA PD ON PROF.CODIGOPROFESSOR = PD.CODIGOPROFESSOR
         LEFT JOIN DISCIPLINA D ON PD.CODIGODISCIPLINA = D.CODIGODISCIPLINA
         `
+        let query = `
+            SELECT 
+                PROF.*,
+                PES.*,
+                0 AS sync,
+                COALESCE(
+                    JSON_AGG(
+                        DISTINCT jsonb_build_object(
+                            'codigopessoa', PES.CODIGOPESSOA,
+                            'codigoprofessor', PROF.CODIGOPROFESSOR
+                        ) || to_jsonb(D)
+                    ) FILTER (WHERE D.CODIGODISCIPLINA IS NOT NULL),
+                    '[]'
+                ) AS disciplinas
+            FROM PESSOA PES
+            JOIN PROFESSOR PROF ON PES.CODIGOPESSOA = PROF.CODIGOPESSOA
+            LEFT JOIN PROFESSOR_DISCIPLINA PD ON PROF.CODIGOPROFESSOR = PD.CODIGOPROFESSOR
+            LEFT JOIN DISCIPLINA D ON PD.CODIGODISCIPLINA = D.CODIGODISCIPLINA
+        `
         const conditions: string[] = []
         const values: any[] = []
         let paramIndex = 1
 
         if (codigoprofessor) {
-        const codigos = Array.isArray(codigoprofessor) ? codigoprofessor : [codigoprofessor]
-        const placeholders = codigos.map((_, i) => `$${paramIndex + i}`)
-        conditions.push(`PROF.CODIGOPESSOA IN (${placeholders.join(',')})`)
-        values.push(...codigos)
-        paramIndex += codigos.length
+            const codigos = Array.isArray(codigoprofessor) ? codigoprofessor : [codigoprofessor]
+            const placeholders = codigos.map((_, i) => `$${paramIndex + i}`)
+            conditions.push(`PROF.CODIGOPESSOA IN (${placeholders.join(',')})`)
+            values.push(...codigos)
+            paramIndex += codigos.length
         }
     
         // filtro por situação
         if (situacao) {
-        const situacoes = Array.isArray(situacao) ? situacao : [situacao]
-        const placeholders = situacoes.map((_, i) => `$${paramIndex + i}`)
-        conditions.push(`PES.SITUACAO IN (${placeholders.join(',')})`)
-        values.push(...situacoes.map(Number))
-        paramIndex += situacoes.length
+            const situacoes = Array.isArray(situacao) ? situacao : [situacao]
+            const placeholders = situacoes.map((_, i) => `$${paramIndex + i}`)
+            conditions.push(`PES.SITUACAO IN (${placeholders.join(',')})`)
+            values.push(...situacoes.map(Number))
+            paramIndex += situacoes.length
         }
     
         // filtro por disciplina
         if (disciplina) {
-
-        const disciplinas = Array.isArray(disciplina) ? disciplina : [disciplina]
-        //console.log(disciplinas)
-        const placeholders = disciplinas.map((_, i) => `$${paramIndex + i}`)
-        conditions.push(`D.CODIGODISCIPLINA IN (${placeholders.join(',')})`)
-        values.push(...disciplinas)
-        paramIndex += disciplinas.length
+            const disciplinas = Array.isArray(disciplina) ? disciplina : [disciplina]
+            //console.log(disciplinas)
+            const placeholders = disciplinas.map((_, i) => `$${paramIndex + i}`)
+            conditions.push(`D.CODIGODISCIPLINA IN (${placeholders.join(',')})`)
+            values.push(...disciplinas)
+            paramIndex += disciplinas.length
         }
     
         // monta WHERE com TIPOPESSOA fixo
         if (conditions.length > 0) {
-        query += ' WHERE ' + conditions.join(' AND ') + ' AND PES.TIPOPESSOA = 1'
+            query += ' WHERE ' + conditions.join(' AND ') + ' AND PES.TIPOPESSOA = 1'
         } else {
-        query += ' WHERE PES.TIPOPESSOA = 1'
+            query += ' WHERE PES.TIPOPESSOA = 1'
         }
     
         query += `

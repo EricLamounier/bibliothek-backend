@@ -149,8 +149,8 @@ export const putAluno = async (request: FastifyRequest, reply: FastifyReply) => 
             if(aluno.imageChanged == 2) { // Imagem prévia removida
                 // Remove imagem do banco e deleta do ImageKit
                 if(imagemBDId.imagem){ // tem imagem no banco
-                    const queryImagem = 'UPDATE PESSOA SET IMAGEM = $1 WHERE CODIGOPESSOA = $2';
-                    await pool.query(queryImagem, [null, aluno.codigopessoa]);
+                    const queryImagem = 'UPDATE PESSOA SET IMAGEM = $1, WHERE CODIGOPESSOA = $3';
+                    await pool.query(queryImagem, [null, aluno.codigopessoa, ]);
                     await deleteImages([imagemBDId.imagem]);
                 }
             }else{ // Não alterou a imagem prévia

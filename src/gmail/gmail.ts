@@ -22,44 +22,55 @@ export const generateCode = (length = 6) => {
 
 const sleep = (ms=5000) => new Promise(resolve => setTimeout(resolve, ms));
 
-export const sendEmails = async(name: any, email: any, code: string, text: string | undefined, subject="Seu acesso Bibliothek") => {
-	
-	const transporter = nodemailer.createTransport({
-		service: 'gmail',
-		auth: {
-		  user: process.env.GMAIL_EMAIL,
-		  pass: process.env.GMAIL_PASSWORD,
-		},
-	});
+export const sendEmails = async (
+  name: string,
+  email: string,
+  code: string,
+  text?: string,
+  subject = "Seu acesso Bibliothek"
+) => {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.GMAIL_EMAIL,
+      pass: process.env.GMAIL_PASSWORD,
+    },
+  });
 
-	if(!text){
-		text = `Hey${name ? `, ${name}` : ''}! Aqui está sua senha de acesso temporário. Não compartilhe com ninguém, ok?`;
-	}
-	
-	const recipientData = {
-		verificationCode: code,
-		name: name ? name : '',
-	};
+  const messageText =
+    text ||
+    `Hey${name ? `, ${name}` : ""}! Aqui está sua senha de acesso temporário. Não compartilhe com ninguém, ok?`;
 
-	const renderedHtml = renderTemplate(emailTemplate, recipientData, text);
-	
-	const mailOptions = {
-		from: 'Bibliothek CEPF <cepf.bibliothek@gmail.com>',    // Sender address
-		to: email, // List of recipients
-		subject: subject,           // Subject line
-		html: renderedHtml,
-		headers: {
-		'Content-Language': 'pt-br' // Define the language of the email as Brazilian Portuguese
-		}
-	};
+  const recipientData = {
+    verificationCode: code,
+    name: name || "",
+  };
 
-	transporter.sendMail(mailOptions, (error: any, info: { response: any; }) => {
-		if (error) {
-		console.log('Error:', error);
-		} else {
-		console.log('Email sent:', info.response);
-		}
-	});
+  try {
+    const renderedHtml = renderTemplate(emailTemplate, recipientData, messageText);
 
-	transporter.close();	
-}
+    const mailOptions = {
+      from: "Bibliothek CEPF <cepf.bibliothek@gmail.com>",
+      to: email,
+      subject,
+      html: renderedHtml,
+      headers: {
+        "Content-Language": "pt-br",
+      },
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+  } catch (error: any) {
+    console.error("Falha ao enviar email:", {
+      message: error.message,
+      code: error.code,
+      response: error.response,
+      stack: error.stack,
+    });
+  } finally {
+    // Fecha a conexão apenas se for um transport baseado em conexão direta (não no pool)
+    if (typeof transporter.close === "function") {
+      transporter.close();
+    }
+  }
+};

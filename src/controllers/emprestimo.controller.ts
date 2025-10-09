@@ -24,7 +24,6 @@ export const getEmprestimo = async(request: FastifyRequest, reply: FastifyReply)
                 EMP.*,
                 PES.*,
                 EMP.OBSERVACAO AS OBSERVACAO,
-                EMP.SITUACAO AS SITUACAO,
                 CAST(SUM(EL.QUANTIDADEDEVOLVIDA) AS INT) AS totaldevolvido,
                 CAST(SUM(EL.QUANTIDADEEMPRESTADA) AS INT) AS totalemprestado,
                 COALESCE(
@@ -164,7 +163,6 @@ export const postEmprestimo = async(request: FastifyRequest, reply: FastifyReply
     
     const emprestimo = request.body as any;
     const token = request.cookies.token;
-    console.log(emprestimo)
 
     try{
         if(!emprestimo){
@@ -293,8 +291,8 @@ export const deleteEmprestimo = async(request: FastifyRequest, reply: FastifyRep
     }
 
     const funcionario = res.funcionario;
-    if(funcionario.tipopessoa !== 2 || (funcionario.privilegio && funcionario.privilegio !== 999)){
-        return reply.status(401).send({ message: 'Você não tem permissão para deletar este emprestimo!', data: ''});
+    if (funcionario.tipopessoa !== 2 || Number(funcionario.privilegio) !== 999) {
+        return reply.status(401).send({ message: 'Você não tem permissão para deletar emprestimos!', data: ''});
     }
 
     try{

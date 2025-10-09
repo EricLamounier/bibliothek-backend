@@ -64,7 +64,6 @@ export const authJWT = async(request: FastifyRequest, reply: FastifyReply) => {
 
         reply.status(200).send({ message: 'Logged successfully!', data: funcionarioFormated });
     }else{
-        console.log(resp)
         reply.status(401).send({ message: 'Invalid JWT Token!' });
     }
 };

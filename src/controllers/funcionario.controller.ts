@@ -91,7 +91,9 @@ export const postFuncionario = async(request: FastifyRequest, reply: FastifyRepl
         }
 
         const funcionarioRequest = res.funcionario;
-        if(funcionarioRequest.tipopessoa !== 2 || (funcionarioRequest.privilegio && Number(funcionarioRequest.privilegio !== 999))){
+        console.log(funcionarioRequest)
+        console.log(res)
+        if (funcionarioRequest.tipopessoa !== 2 || Number(funcionarioRequest.privilegio) !== 999) {
             return reply.status(401).send({ message: 'Funcionário sem privilégio para criar outros funcionários!', data: ''});
         }
 
@@ -157,7 +159,7 @@ export const putFuncionario = async (request: FastifyRequest, reply: FastifyRepl
         }
 
         const funcionarioRequest = res.funcionario;
-        if(funcionarioRequest.tipopessoa !== 2 || (funcionarioRequest.privilegio && Number(funcionarioRequest.privilegio !== 999))){
+       if (funcionarioRequest.tipopessoa !== 2 || Number(funcionarioRequest.privilegio) !== 999) {
             return reply.status(401).send({ message: 'Funcionário sem privilégio para editar outros funcionários!', data: ''});
         }
 
@@ -225,9 +227,14 @@ export const resetSenhaFuncionario = async (request: FastifyRequest, reply: Fast
         return reply.code(401).send({ error: "Token not found!" });
     }
 
-    const resp = await verifyJWT(token)
-    if(!resp){
+    const res = await verifyJWT(token)
+    if(!res){
         return reply.code(401).send({ error: "Invalid JWT Token!" });
+    }
+
+    const funcionarioRequest = res.funcionario;
+   if (funcionarioRequest.tipopessoa !== 2 || Number(funcionarioRequest.privilegio) !== 999) {
+        return reply.status(401).send({ message: 'Funcionário sem privilégio para alterar funcionários!', data: ''});
     }
     
     try{
@@ -274,7 +281,7 @@ export const deleteFuncionario = async (request: FastifyRequest, reply: FastifyR
         }
 
         const funcionarioRequest = res.funcionario;
-        if(funcionarioRequest.tipopessoa !== 2 || (funcionarioRequest.privilegio && Number(funcionarioRequest.privilegio !== 999))){
+        if (funcionarioRequest.tipopessoa !== 2 || Number(funcionarioRequest.privilegio) !== 999) {
             return reply.status(401).send({ message: 'Funcionário sem privilégio para excluir outros funcionários!', data: ''});
         }
 

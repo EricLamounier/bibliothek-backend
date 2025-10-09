@@ -16,6 +16,7 @@ import livroRoutes from './routes/livro.route';
 import emprestimoRoutes from './routes/emprestimo.route';
 import resetPasswordRoute from './routes/resetPassword.route';
 import fs from 'fs';
+import syncRoutes from './routes/sync';
 
 
 
@@ -56,5 +57,6 @@ app.register(funcionarioRoutes, { prefix: '/funcionario'});
 app.register(disciplinaRoutes, { prefix: '/disciplina'});
 app.register(livroRoutes, { prefix: '/livro'});
 app.register(emprestimoRoutes, { prefix: '/emprestimo'});
+app.register(syncRoutes, { prefix: '/sync'});
 
 export default app;

@@ -26,23 +26,23 @@ export const getDisciplina = async (request: FastifyRequest, reply: FastifyReply
     
         // filtro por situação
         if (situacao) {
-        const situacoes = Array.isArray(situacao) ? situacao : [situacao]
-        const placeholders = situacoes.map((_, i) => `$${paramIndex + i}`)
-        conditions.push(`SITUACAO IN (${placeholders.join(',')})`)
-        values.push(...situacoes.map(Number)) // garante que seja número
-        paramIndex += situacoes.length
+            const situacoes = Array.isArray(situacao) ? situacao : [situacao]
+            const placeholders = situacoes.map((_, i) => `$${paramIndex + i}`)
+            conditions.push(`SITUACAO IN (${placeholders.join(',')})`)
+            values.push(...situacoes.map(Number)) // garante que seja número
+            paramIndex += situacoes.length
         }
 
         if (disciplina) {
-        const disciplinas = Array.isArray(disciplina) ? disciplina : [disciplina]
-        const placeholders = disciplinas.map((_, i) => `$${paramIndex + i}`)
-        conditions.push(`CODIGODISCIPLINA IN (${placeholders.join(',')})`)
-        values.push(...disciplinas)
-        paramIndex += disciplinas.length
+            const disciplinas = Array.isArray(disciplina) ? disciplina : [disciplina]
+            const placeholders = disciplinas.map((_, i) => `$${paramIndex + i}`)
+            conditions.push(`CODIGODISCIPLINA IN (${placeholders.join(',')})`)
+            values.push(...disciplinas)
+            paramIndex += disciplinas.length
         }
     
         if (conditions.length > 0) {
-        query += ' WHERE ' + conditions.join(' AND ')
+            query += ' WHERE ' + conditions.join(' AND ')
         }
     
         query += ' GROUP BY CODIGODISCIPLINA, NOME, OBSERVACAO, SITUACAO'
