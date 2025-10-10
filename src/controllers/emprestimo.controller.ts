@@ -119,7 +119,7 @@ export const getEmprestimo = async(request: FastifyRequest, reply: FastifyReply)
 
         reply.status(200).send({ message: 'Emprestimo found successfully!', data:  rows});
     }catch(err){
-        //console.log(err)
+        console.log(err)
         reply.status(500).send({ message: 'Emprestimo not found!', data: err });
     }
 }
