@@ -5,6 +5,7 @@ import { verifyJWT } from '../utils/jwt';
 export const getEmprestimo = async(request: FastifyRequest, reply: FastifyReply) => {
     
     const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
+    console.log(request.headers.authorization?.replace('Bearer ', ''))
     const { codigopessoa, livro, datainiciocriacao, datafimcriacao, datainiciodevolucao, datafimdevolucao, situacao } = request.query as { codigopessoa?: number[], livro?: number[], datainiciocriacao?: string, datafimcriacao?: string, datainiciodevolucao?: string, datafimdevolucao?: string, situacao?: string[] };
     
     try{

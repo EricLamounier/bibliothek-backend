@@ -3,7 +3,7 @@ import pool from '../config/db';
 import { verifyJWT } from '../utils/jwt';
 
 export const syncStatus = async (request: FastifyRequest, reply: FastifyReply) => {
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
     const tabelas = [
         'aluno', 'autor', 'disciplina', 'editora', 'emprestimo', 'livro', 'professor'
       ];
