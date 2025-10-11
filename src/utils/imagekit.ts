@@ -139,4 +139,28 @@ export async function processAndUploadImage(imageField: any, folder: string): Pr
     console.error('[processAndUploadImage] Erro ao processar ou fazer upload da imagem:', err);
     throw err;
   }
+} 
+
+export async function processAndUploadImageBase64(base64: any, filename: string, folder: string): Promise<{ fileId: string; filePath: string; url: string } | null> {
+  if (!base64) return null;
+
+  console.log(filename)
+
+  try {
+    const dataUri = `data:${base64.mimetype};base64,${base64}`;
+
+    const imageUrl = await imagekit.upload({
+      file: dataUri,
+      fileName: filename,
+      folder: folder,
+      useUniqueFileName: false, 
+    });
+
+    console.log(imageUrl)
+
+    return imageUrl;
+  } catch (err) {
+    console.error('[processAndUploadImageBase64] Erro ao processar ou fazer upload da imagem:', err);
+    throw err;
+  }
 }
