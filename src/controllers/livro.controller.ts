@@ -1,24 +1,23 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import pool from '../config/db';
 import { verifyJWT } from '../utils/jwt';
-import { deleteImages, processAndUploadImage, processAndUploadImageBase64 } from '../utils/imagekit';
-import { MultipartFile } from '@fastify/multipart';
+import { deleteImages, processAndUploadImageBase64 } from '../utils/imagekit';
 
 export const getLivro = async (request: FastifyRequest, reply: FastifyReply) => {
     const { codigolivro, autor, editora, disponibilidade, situacao } = request.query as { codigolivro?: number[], autor?: number[], editora?: number[], disponibilidade?: string[], situacao?: string[] };
     const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
     
-    if(!token){
-        return reply.status(401).send({ message: 'Token not found!' });
-    }
+    try{
+        if(!token){
+            return reply.status(401).send({ message: 'Token not found!' });
+        }
+        
+        const res = await verifyJWT(token);
+        
+        if(!res){
+            return reply.status(401).send({ message: 'Expired section!', data: ''});
+        }
     
-    const res = await verifyJWT(token);
-    
-    if(!res){
-        return reply.status(401).send({ message: 'Expired section!', data: ''});
-    }
-    
-    try {
         let queryLivros = `
             SELECT DISTINCT l.*, e.NOME AS NOMEEDITORA
             FROM LIVRO l
@@ -210,6 +209,7 @@ export const postLivro = async(request: FastifyRequest, reply: FastifyReply) => 
 
     } catch(err : any) {
         await pool.query('ROLLBACK');
+        console.log(err)
         imagemImageKit && await deleteImages([imagemImageKit?.fileId])
         reply.status(500).send({ message: 'Livro not inserted!', data: err, errorMessage: err?.message });
     }
@@ -329,6 +329,7 @@ export const putLivro = async (request: FastifyRequest, reply: FastifyReply) => 
 
     }catch(err : any){
         await pool.query('ROLLBACK');
+        console.log(err)
         reply.status(500).send({ message: 'Livro not updated!', data: err, errorMessage: err?.message });
     }
 };
@@ -374,8 +375,7 @@ export const deleteLivro = async (request: FastifyRequest, reply: FastifyReply) 
         reply.status(200).send({ message: 'Livro deleted successfully!', data:  'success'});
     }catch(err : any){
         await pool.query('ROLLBACK');
+        console.log(err)
         reply.status(500).send({ message: 'Livro not deleted!', data: err, errorMessage: err?.message });
     }
-
-
 };

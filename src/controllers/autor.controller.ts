@@ -6,47 +6,50 @@ export const getAutor = async (request: FastifyRequest, reply: FastifyReply) => 
     const { autor, situacao } = request.query as { autor?: string | string[], situacao?: number | number[] }
     const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
     
-    if(!token){
-        return reply.code(401).send({ error: "Token not found!" });
-    }
+    try{
+        if(!token){
+            return reply.code(401).send({ error: "Token not found!" });
+        }
 
-    const resp = await verifyJWT(token)
-    if(!resp){
-        return reply.code(401).send({ error: "Invalid JWT Token!" });
+        const resp = await verifyJWT(token)
+        if(!resp){
+            return reply.code(401).send({ error: "Invalid JWT Token!" });
+        }
+    
+        let query = `SELECT * FROM AUTOR`
+        const conditions: string[] = []
+        const values: any[] = []
+        let paramIndex = 1
+    
+        if (autor) {
+        const autores = Array.isArray(autor) ? autor : [autor]
+        const placeholders = autores.map((_, i) => `$${paramIndex + i}`)
+        conditions.push(`CODIGOAUTOR IN (${placeholders.join(',')})`)
+        values.push(...autores)
+        paramIndex += autores.length
+        }
+    
+        if (situacao) {
+        const situacoes = Array.isArray(situacao) ? situacao : [situacao]
+        const placeholders = situacoes.map((_, i) => `$${paramIndex + i}`)
+        conditions.push(`SITUACAO IN (${placeholders.join(',')})`)
+        values.push(...situacoes.map(Number))
+        paramIndex += situacoes.length
+        }
+    
+        if (conditions.length > 0) {
+        query += ' WHERE ' + conditions.join(' AND ')
+        }
+    
+        query += ' GROUP BY CODIGOAUTOR, NOME, OBSERVACAO, SITUACAO'
+    
+        const { rows } = await pool.query(query, values)
+    
+        reply.status(200).send({ message: 'Autores fetched successfully!', data: rows })
+    }catch(err){
+        console.log(err)
+        reply.status(500).send({ message: 'Autores not fetched!', data: err });
     }
-  
-    let query = `SELECT * FROM AUTOR`
-    const conditions: string[] = []
-    const values: any[] = []
-    let paramIndex = 1
-  
-    if (autor) {
-      const autores = Array.isArray(autor) ? autor : [autor]
-      const placeholders = autores.map((_, i) => `$${paramIndex + i}`)
-      conditions.push(`CODIGOAUTOR IN (${placeholders.join(',')})`)
-      values.push(...autores)
-      paramIndex += autores.length
-    }
-  
-    if (situacao) {
-      const situacoes = Array.isArray(situacao) ? situacao : [situacao]
-      const placeholders = situacoes.map((_, i) => `$${paramIndex + i}`)
-      conditions.push(`SITUACAO IN (${placeholders.join(',')})`)
-      values.push(...situacoes.map(Number))
-      paramIndex += situacoes.length
-    }
-  
-    if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ')
-    }
-  
-    query += ' GROUP BY CODIGOAUTOR, NOME, OBSERVACAO, SITUACAO'
-  
-    //console.log(query, values)
-  
-    const { rows } = await pool.query(query, values)
-  
-    reply.status(200).send({ message: 'Autores fetched successfully!', data: rows })
 }
 
 export const postAutor = async(request: FastifyRequest, reply: FastifyReply) => {
@@ -83,6 +86,7 @@ export const postAutor = async(request: FastifyRequest, reply: FastifyReply) => 
         reply.status(200).send({ message: 'Autor inserted successfully!', data:  novoAutor});
     }catch(err){
         await pool.query('ROLLBACK');
+        console.log(err)
         reply.status(500).send({ message: 'Autor not inserted!', data: err });
     }
 };
@@ -153,6 +157,7 @@ export const deleteAutor = async (request: FastifyRequest, reply: FastifyReply) 
         reply.status(200).send({ message: 'Autor deleted successfully!', data:  rows[0]});
     }catch(err){
         await pool.query('ROLLBACK');
+        console.log(err)
         reply.status(500).send({ message: 'Autor not deleted!', data: err });
     }
 

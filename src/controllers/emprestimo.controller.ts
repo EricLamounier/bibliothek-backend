@@ -243,7 +243,7 @@ export const devolveEmprestimo = async(request: FastifyRequest, reply: FastifyRe
         reply.status(200).send({ message: 'Emprestimo returned successfully!', data:  'sucess' });
     }catch(err){
         await pool.query('ROLLBACK');
-        //console.log(err)
+        console.log(err)
         reply.status(500).send({ message: 'Emprestimo not returned!', data: err });
     }
 }

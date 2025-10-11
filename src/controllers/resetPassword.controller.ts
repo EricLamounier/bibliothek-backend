@@ -39,7 +39,7 @@ export const sendOtp = async (request: FastifyRequest, reply: FastifyReply) => {
         reply.status(200).send({ message: 'Código de verificação enviado com sucesso!', data: rows[0] });
         await pool.query('COMMIT');
     } catch (err) {
-        //console.log(err)
+        console.log(err)
         reply.code(400).send({ message: "Something went wrong!", data: err });
     }
 };

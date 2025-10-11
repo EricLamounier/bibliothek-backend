@@ -1,8 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import pool from '../config/db';
 import { verifyJWT } from '../utils/jwt';
-import { deleteImages, processAndUploadImage, processAndUploadImageBase64 } from '../utils/imagekit';
-import { MultipartFile } from '@fastify/multipart';
+import { deleteImages, processAndUploadImageBase64 } from '../utils/imagekit';
 
 export const getAluno = async (request: FastifyRequest, reply: FastifyReply) => {
     try{
@@ -117,6 +116,7 @@ export const postAluno = async(request: FastifyRequest, reply: FastifyReply) => 
         reply.status(200).send({ message: 'Aluno inserted successfully!', data:  createdData});
     }catch(err : any){
         await pool.query('ROLLBACK');
+        console.log(err)
         imagemImageKit && await deleteImages([imagemImageKit?.fileId])
         reply.status(500).send({ message: 'Aluno not inserted!', data: err, errorMessage: err?.message });
     }
@@ -185,6 +185,7 @@ export const putAluno = async (request: FastifyRequest, reply: FastifyReply) => 
         reply.status(200).send({ message: 'Aluno updated successfully!', data:  updatedAluno});
     }catch(err : any){
         await pool.query('ROLLBACK');
+        console.log(err)
         imagemImageKit && await deleteImages([imagemImageKit?.fileId])
         reply.status(500).send({ message: 'Aluno not updated!', data: err, errorMessage: err?.message });
     }
@@ -228,7 +229,8 @@ export const deleteAluno = async (request: FastifyRequest, reply: FastifyReply) 
 
         reply.status(200).send({ message: 'Aluno deleted successfully!', data:  aluno});
     }catch(err : any){
+        console.log(err)
         await pool.query('ROLLBACK');
-        reply.status(400).send({ message: 'Aluno not deleted!', data: err, errorMessage: err?.message });
+        reply.status(500).send({ message: 'Aluno not deleted!', data: err, errorMessage: err?.message });
     }
 };

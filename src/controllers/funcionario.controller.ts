@@ -8,64 +8,69 @@ export const getFuncionario = async (request: FastifyRequest, reply: FastifyRepl
     const { funcionario, privilegio, situacao } = request.query as { funcionario?: number, privilegio?: string, situacao?: string };
     const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
-    if(!token){
-        return reply.code(401).send({ error: "Token not found!" });
+    try{
+        if(!token){
+            return reply.code(401).send({ error: "Token not found!" });
+        }
+
+        const resp = await verifyJWT(token)
+        if(!resp){
+            return reply.code(401).send({ error: "Invalid JWT Token!" });
+        }
+        
+        let query = `SELECT 
+                        PES.*,
+                        FUN.CODIGOFUNCIONARIO,
+                        FUN.EMAIL,
+                        FUN.DATAADMISSAO,
+                        FUN.PRIVILEGIO	
+                    FROM PESSOA PES JOIN FUNCIONARIO FUN ON PES.CODIGOPESSOA = FUN.CODIGOPESSOA
+                `;
+        const conditions: string[] = []
+        const values: any[] = []
+        let paramIndex = 1
+
+        if (funcionario) {
+            const funcionarios = Array.isArray(funcionario) ? funcionario : [funcionario]
+            const placeholders = funcionarios.map((_, i) => `$${paramIndex + i}`)
+            conditions.push(`FUN.CODIGOFUNCIONARIO IN (${placeholders.join(',')})`)
+            values.push(...funcionarios)
+            paramIndex += funcionarios.length
+        }
+
+        if (privilegio) {
+            const privilegios = Array.isArray(privilegio) ? privilegio : [privilegio]
+            const placeholders = privilegios.map((_, i) => `$${paramIndex + i}`)
+            conditions.push(`FUN.PRIVILEGIO IN (${placeholders.join(',')})`)
+            values.push(...privilegios)
+            paramIndex += privilegios.length
+        }
+
+        if (situacao) {
+            const situacoes = Array.isArray(situacao) ? situacao : [situacao]
+            const placeholders = situacoes.map((_, i) => `$${paramIndex + i}`)
+            conditions.push(`SITUACAO IN (${placeholders.join(',')})`)
+            values.push(...situacoes.map(Number))
+            paramIndex += situacoes.length
+        }
+
+        if (conditions.length > 0) {
+            query += ' WHERE ' + conditions.join(' AND ') + ' AND PES.TIPOPESSOA = 2'
+        } else {
+            query += ' WHERE PES.TIPOPESSOA = 2'
+        }
+
+        query += `
+            GROUP BY PES.CODIGOPESSOA, PES.NOME, PES.CONTATO, FUN.CODIGOFUNCIONARIO
+        `;
+
+        const { rows : funcionarios } = await pool.query(query, values);
+
+        reply.status(200).send({ message: 'Funcionarios fetched successfully!', data: funcionarios });
+    }catch(err){
+        console.log(err)
+        reply.status(500).send({ message: 'Funcionarios not fetched!', data: err });
     }
-
-    const resp = await verifyJWT(token)
-    if(!resp){
-        return reply.code(401).send({ error: "Invalid JWT Token!" });
-    }
-    
-    let query = `SELECT 
-                    PES.*,
-                    FUN.CODIGOFUNCIONARIO,
-                    FUN.EMAIL,
-                    FUN.DATAADMISSAO,
-                    FUN.PRIVILEGIO	
-                FROM PESSOA PES JOIN FUNCIONARIO FUN ON PES.CODIGOPESSOA = FUN.CODIGOPESSOA
-            `;
-    const conditions: string[] = []
-    const values: any[] = []
-    let paramIndex = 1
-
-    if (funcionario) {
-        const funcionarios = Array.isArray(funcionario) ? funcionario : [funcionario]
-        const placeholders = funcionarios.map((_, i) => `$${paramIndex + i}`)
-        conditions.push(`FUN.CODIGOFUNCIONARIO IN (${placeholders.join(',')})`)
-        values.push(...funcionarios)
-        paramIndex += funcionarios.length
-    }
-
-    if (privilegio) {
-        const privilegios = Array.isArray(privilegio) ? privilegio : [privilegio]
-        const placeholders = privilegios.map((_, i) => `$${paramIndex + i}`)
-        conditions.push(`FUN.PRIVILEGIO IN (${placeholders.join(',')})`)
-        values.push(...privilegios)
-        paramIndex += privilegios.length
-    }
-
-    if (situacao) {
-        const situacoes = Array.isArray(situacao) ? situacao : [situacao]
-        const placeholders = situacoes.map((_, i) => `$${paramIndex + i}`)
-        conditions.push(`SITUACAO IN (${placeholders.join(',')})`)
-        values.push(...situacoes.map(Number))
-        paramIndex += situacoes.length
-    }
-
-    if (conditions.length > 0) {
-        query += ' WHERE ' + conditions.join(' AND ') + ' AND PES.TIPOPESSOA = 2'
-    } else {
-        query += ' WHERE PES.TIPOPESSOA = 2'
-    }
-
-    query += `
-        GROUP BY PES.CODIGOPESSOA, PES.NOME, PES.CONTATO, FUN.CODIGOFUNCIONARIO
-    `;
-
-    const { rows : funcionarios } = await pool.query(query, values);
-
-    reply.status(200).send({ message: 'Funcionarios fetched successfully!', data: funcionarios });
 };
 
 export const postFuncionario = async(request: FastifyRequest, reply: FastifyReply) => {
@@ -123,7 +128,7 @@ export const postFuncionario = async(request: FastifyRequest, reply: FastifyRepl
 
         const {senha, ...formatedFuncionario} = createdData;
 
-        //sendEmails(funcionario.nome, funcionario.email, tempPassword, undefined, "Seu acesso Bibliothek");
+        sendEmails(funcionario.nome, funcionario.email, tempPassword, undefined, "Seu acesso Bibliothek");
  
         reply.status(200).send({ message: 'Funcionario inserted successfully!', data:  formatedFuncionario});
     }catch(err : any){
@@ -137,7 +142,7 @@ export const postFuncionario = async(request: FastifyRequest, reply: FastifyRepl
 export const putFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
     const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
-    const { funcionario } = request.body as { funcionario: any };
+    const funcionario = request.body as any;
     let imagemImageKit = null;
 
     try{
@@ -202,6 +207,7 @@ export const putFuncionario = async (request: FastifyRequest, reply: FastifyRepl
         reply.status(200).send({ message: 'Funcionario updated successfully!', data:  updatedFuncionario});
     }catch(err : any){
         await pool.query('ROLLBACK');
+        console.log(err)
         imagemImageKit && await deleteImages([imagemImageKit?.fileId])      
         reply.status(500).send({ message: 'Funcionario not updated!', data: err, errorMessage: err?.message });
     }
@@ -254,6 +260,7 @@ export const deleteFuncionario = async (request: FastifyRequest, reply: FastifyR
         reply.status(200).send({ message: 'Funcionario deleted successfully!', data:  codigopessoa});
     }catch(err : any){
         await pool.query('ROLLBACK');
+        console.log(err)
         reply.status(200).send({ message: 'Funcionario not deleted!', data: err, errorMessage: err?.message });
     }
 };
@@ -295,7 +302,7 @@ export const resetSenhaFuncionario = async (request: FastifyRequest, reply: Fast
         reply.status(200).send({ message: 'Funcionario updated successfully!', data:  funcionario});
         await pool.query('COMMIT');
     }catch(err : any){
-        //console.log(err)
+        console.log(err)
         await pool.query('ROLLBACK');
         reply.status(500).send({ message: 'Funcionario not updated!', data: err, errorMessage: err?.message });
     }

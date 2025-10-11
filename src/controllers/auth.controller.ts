@@ -2,8 +2,7 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import dotenv from 'dotenv';
 import pool from '../config/db';
 import { comparePassword, createJWT, hashPassword, verifyJWT } from '../utils/jwt';
-import { deleteImages, processAndUploadImage, processAndUploadImageBase64 } from '../utils/imagekit';
-import { MultipartFile } from '@fastify/multipart';
+import { deleteImages, processAndUploadImageBase64 } from '../utils/imagekit';
 
 dotenv.config();
 
