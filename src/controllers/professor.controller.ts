@@ -7,7 +7,7 @@ import { MultipartFile } from '@fastify/multipart';
 export const getProfessor = async (request: FastifyRequest, reply: FastifyReply) => {
     const { codigoprofessor, situacao, disciplina } = request.query as { codigoprofessor?: number | number[], situacao?: number | number[], disciplina?: number | number[] }
     
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
     try{
         if(!token){
             return reply.code(401).send({ error: "Token not found!" });
@@ -108,7 +108,7 @@ export const getProfessor = async (request: FastifyRequest, reply: FastifyReply)
 }
 
 export const postProfessor = async (request: FastifyRequest, reply: FastifyReply) => {
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
   
     // request.body agora é um array de formData
     const formData = request.body as { professor: { value: string }, image?: MultipartFile };
@@ -182,7 +182,7 @@ export const postProfessor = async (request: FastifyRequest, reply: FastifyReply
   };  
 
 export const putProfessor = async (request: FastifyRequest, reply: FastifyReply) => {
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
     
     const { professor: professorField, image } = request.body as { professor: { value: string }, image?: MultipartFile };
     const professor = JSON.parse(professorField.value);
@@ -286,7 +286,7 @@ export const putProfessor = async (request: FastifyRequest, reply: FastifyReply)
 
 export const deleteProfessor = async (request: FastifyRequest, reply: FastifyReply) => {
     const { professor } = request.body as {professor : any};
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     try{
         if(!professor){

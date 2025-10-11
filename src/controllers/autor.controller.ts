@@ -4,7 +4,7 @@ import { verifyJWT } from '../utils/jwt';
 
 export const getAutor = async (request: FastifyRequest, reply: FastifyReply) => {
     const { autor, situacao } = request.query as { autor?: string | string[], situacao?: number | number[] }
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
     
     if(!token){
         return reply.code(401).send({ error: "Token not found!" });
@@ -51,7 +51,7 @@ export const getAutor = async (request: FastifyRequest, reply: FastifyReply) => 
 
 export const postAutor = async(request: FastifyRequest, reply: FastifyReply) => {
     const autor = request.body as any;
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     try{
         if (!autor) {
@@ -89,7 +89,7 @@ export const postAutor = async(request: FastifyRequest, reply: FastifyReply) => 
 
 export const putAutor = async (request: FastifyRequest, reply: FastifyReply) => {
     const autor = request.body as any;
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     try{
         if(!autor){
@@ -127,7 +127,7 @@ export const putAutor = async (request: FastifyRequest, reply: FastifyReply) => 
   
 export const deleteAutor = async (request: FastifyRequest, reply: FastifyReply) => {
     const {autor} = request.body as any;
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     try{
         if(!autor){

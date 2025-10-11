@@ -6,7 +6,19 @@ import { MultipartFile } from '@fastify/multipart';
 
 export const getAluno = async (request: FastifyRequest, reply: FastifyReply) => {
     try{
+        const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
         const { aluno, situacao } = request.query as { aluno?: number, situacao?: string };
+
+        if(!token){
+            return reply.status(401).send({ message: 'Token not found!' });
+        }
+
+        const res = await verifyJWT(token);
+
+        if(!res){
+            return reply.status(401).send({ message: 'Expired section!', data: ''});
+        }
+
         let query = `
             SELECT
                 PES.*,
@@ -58,7 +70,7 @@ export const getAluno = async (request: FastifyRequest, reply: FastifyReply) => 
 
 export const postAluno = async(request: FastifyRequest, reply: FastifyReply) => {
     
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     const { aluno: alunoField, image } = request.body as { aluno: { value: string }, image?: MultipartFile };
     const aluno = JSON.parse(alunoField.value); 
@@ -112,7 +124,7 @@ export const postAluno = async(request: FastifyRequest, reply: FastifyReply) => 
 };
 
 export const putAluno = async (request: FastifyRequest, reply: FastifyReply) => {
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     const { aluno: alunoField, image } = request.body as { aluno: { value: string }, image?: MultipartFile };
     const aluno = JSON.parse(alunoField.value);
@@ -189,7 +201,7 @@ export const putAluno = async (request: FastifyRequest, reply: FastifyReply) => 
 
 export const deleteAluno = async (request: FastifyRequest, reply: FastifyReply) => {
     const { aluno } = request.body as any;
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     try{
         if(!aluno){

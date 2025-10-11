@@ -5,7 +5,6 @@ import { verifyJWT } from '../utils/jwt';
 export const getEmprestimo = async(request: FastifyRequest, reply: FastifyReply) => {
     
     const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
-    console.log(request.headers.authorization?.replace('Bearer ', ''))
     const { codigopessoa, livro, datainiciocriacao, datafimcriacao, datainiciodevolucao, datafimdevolucao, situacao } = request.query as { codigopessoa?: number[], livro?: number[], datainiciocriacao?: string, datafimcriacao?: string, datainiciodevolucao?: string, datafimdevolucao?: string, situacao?: string[] };
     
     try{
@@ -128,7 +127,7 @@ export const getEmprestimo = async(request: FastifyRequest, reply: FastifyReply)
 export const getExisteEmprestimoAberto = async(request: FastifyRequest, reply: FastifyReply) => {
     
     const { codigopessoa } = request.query as { codigopessoa?: number | string };
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     if(!token){
         return reply.code(401).send({ error: "Token not found!" });
@@ -163,7 +162,7 @@ export const getExisteEmprestimoAberto = async(request: FastifyRequest, reply: F
 export const postEmprestimo = async(request: FastifyRequest, reply: FastifyReply) => {
     
     const emprestimo = request.body as any;
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     try{
         if(!emprestimo){
@@ -211,7 +210,7 @@ export const postEmprestimo = async(request: FastifyRequest, reply: FastifyReply
 
 export const devolveEmprestimo = async(request: FastifyRequest, reply: FastifyReply) => {
     const { emprestimo } = request.body as {emprestimo : any};
-    const token = request.cookies.token;    
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');    
     
     if(!token){
         return reply.status(401).send({ message: 'Token not found!' });
@@ -251,7 +250,7 @@ export const devolveEmprestimo = async(request: FastifyRequest, reply: FastifyRe
 
 export const renovaEmprestimo = async(request: FastifyRequest, reply: FastifyReply) => {
     const { emprestimo } = request.body as {emprestimo : any};
-    const token = request.cookies.token;   
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');   
         
     if(!token){
         return reply.status(401).send({ message: 'Token not found!' });

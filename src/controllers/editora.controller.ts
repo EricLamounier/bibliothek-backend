@@ -4,7 +4,7 @@ import { verifyJWT } from '../utils/jwt';
 import { capitalizarTexto } from '../utils/utils';
 export const getEditora = async (request: FastifyRequest, reply: FastifyReply) => {
     const { editora, situacao } = request.query as { editora?: string | string[], situacao?: number | number[] }
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     if(!token){
         return reply.code(401).send({ error: "Token not found!" });
@@ -54,7 +54,7 @@ export const getEditora = async (request: FastifyRequest, reply: FastifyReply) =
  
 export const postEditora = async(request: FastifyRequest, reply: FastifyReply) => {
     const editora = request.body as any;
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     try{
         if (!editora) {
@@ -92,7 +92,7 @@ export const postEditora = async(request: FastifyRequest, reply: FastifyReply) =
 
 export const putEditora = async (request: FastifyRequest, reply: FastifyReply) => {
     const editora = request.body as any;
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     try{
         if(!editora){
@@ -128,7 +128,7 @@ export const putEditora = async (request: FastifyRequest, reply: FastifyReply) =
 
 export const deleteEditora = async (request: FastifyRequest, reply: FastifyReply) => {
     const {editora} = request.body as any;
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     try{
         if(!editora){

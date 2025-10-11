@@ -4,7 +4,7 @@ import { verifyJWT } from '../utils/jwt';
 
 export const getDisciplina = async (request: FastifyRequest, reply: FastifyReply) => {
     const { disciplina, situacao } = request.query as { disciplina?: string | string[], situacao?: string | string[] }
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
     try{
         if(!token){
             return reply.code(401).send({ error: "Token not found!" });
@@ -58,7 +58,7 @@ export const getDisciplina = async (request: FastifyRequest, reply: FastifyReply
 
 export const postDisciplina = async(request: FastifyRequest, reply: FastifyReply) => {
     const disciplina = request.body as any;
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     try{
         if (!disciplina) {
@@ -98,7 +98,7 @@ export const postDisciplina = async(request: FastifyRequest, reply: FastifyReply
 
 export const putDisciplina = async (request: FastifyRequest, reply: FastifyReply) => {
     const disciplina = request.body as {disciplina : any};
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     try{
         if(!disciplina){
@@ -139,7 +139,7 @@ export const putDisciplina = async (request: FastifyRequest, reply: FastifyReply
 
 export const deleteDisciplina = async (request: FastifyRequest, reply: FastifyReply) => {
     const { disciplina } = request.body as {disciplina : any};
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     try{
         if(!disciplina){

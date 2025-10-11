@@ -6,7 +6,7 @@ import { MultipartFile } from '@fastify/multipart';
 
 export const getLivro = async (request: FastifyRequest, reply: FastifyReply) => {
     const { codigolivro, autor, editora, disponibilidade, situacao } = request.query as { codigolivro?: number[], autor?: number[], editora?: number[], disponibilidade?: string[], situacao?: string[] };
-    const token = request.cookies.token
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
     
     if(!token){
         return reply.status(401).send({ message: 'Token not found!' });
@@ -114,7 +114,7 @@ export const getLivro = async (request: FastifyRequest, reply: FastifyReply) => 
 export const postLivro = async(request: FastifyRequest, reply: FastifyReply) => {
 
     const { livro: livroField, image } = request.body as { livro: { value: string }, image?: MultipartFile };
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     const livro = JSON.parse(livroField.value);
     let imageUrl = null
@@ -219,7 +219,7 @@ export const postLivro = async(request: FastifyRequest, reply: FastifyReply) => 
 
 export const putLivro = async (request: FastifyRequest, reply: FastifyReply) => {
     const { livro: livroField, image } = request.body as { livro: { value: string }, image?: MultipartFile };
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     const livro = JSON.parse(livroField.value);
     try{
@@ -344,7 +344,7 @@ export const putLivro = async (request: FastifyRequest, reply: FastifyReply) => 
 
 export const deleteLivro = async (request: FastifyRequest, reply: FastifyReply) => {
     const { livro } = request.body as any;
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     try{
         if(!livro){

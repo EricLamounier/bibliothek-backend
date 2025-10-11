@@ -7,7 +7,7 @@ import { MultipartFile } from '@fastify/multipart';
 
 export const getFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
     const { funcionario, privilegio, situacao } = request.query as { funcionario?: number, privilegio?: string, situacao?: string };
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');;
 
     if(!token){
         return reply.code(401).send({ error: "Token not found!" });
@@ -73,7 +73,7 @@ export const getFuncionario = async (request: FastifyRequest, reply: FastifyRepl
 
 export const postFuncionario = async(request: FastifyRequest, reply: FastifyReply) => {
     
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');;
 
     const { funcionario: funcionarioField, image } = request.body as { funcionario: { value: string }, image?: MultipartFile };
     const funcionario = JSON.parse(funcionarioField.value);
@@ -140,7 +140,7 @@ export const postFuncionario = async(request: FastifyRequest, reply: FastifyRepl
 };
 
 export const putFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');;
 
     const { funcionario: funcionarioField, image } = request.body as { funcionario: { value: string }, image?: MultipartFile };
     const funcionario = JSON.parse(funcionarioField.value);
@@ -221,7 +221,7 @@ export const putFuncionario = async (request: FastifyRequest, reply: FastifyRepl
 
 export const resetSenhaFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
     const { funcionario} = request.body as {funcionario : any}; 
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');;
 
     if(!token){
         return reply.code(401).send({ error: "Token not found!" });
@@ -264,7 +264,7 @@ export const resetSenhaFuncionario = async (request: FastifyRequest, reply: Fast
 
 export const deleteFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
     const { codigopessoa } = request.query as {codigopessoa : number};
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');;
     try{
         if(!codigopessoa){
             return reply.status(400).send({ message: "Funcionario's ID required!" })
