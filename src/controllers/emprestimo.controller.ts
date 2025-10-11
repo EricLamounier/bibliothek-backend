@@ -4,7 +4,7 @@ import { verifyJWT } from '../utils/jwt';
 
 export const getEmprestimo = async(request: FastifyRequest, reply: FastifyReply) => {
     
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
     const { codigopessoa, livro, datainiciocriacao, datafimcriacao, datainiciodevolucao, datafimdevolucao, situacao } = request.query as { codigopessoa?: number[], livro?: number[], datainiciocriacao?: string, datafimcriacao?: string, datainiciodevolucao?: string, datafimdevolucao?: string, situacao?: string[] };
     
     try{
@@ -279,7 +279,7 @@ export const renovaEmprestimo = async(request: FastifyRequest, reply: FastifyRep
 
 export const deleteEmprestimo = async(request: FastifyRequest, reply: FastifyReply) => {
     const {emprestimo} = request.body as any;
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
     
     if(!token){
         return reply.status(401).send({ message: 'Token not found!' });
