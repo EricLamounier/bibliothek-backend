@@ -15,8 +15,6 @@ export async function renameImage(filePath: string, newFileName: string, folder 
         newFileName: `${newFileName}.png`,
         purgeCache: false, // optional
     });
-
-    //console.log(`[ImageKit] Arquivo renomeado com sucesso:`, `${newFileName}.png`);
     return true;
   } catch (error) {
     console.error(`[ImageKit] Erro ao renomear imagem com ID ${filePath}:`, error);
@@ -70,7 +68,6 @@ async function compressImage(buffer: Buffer, targetSizeKB: number): Promise<Buff
 }
 
 export async function uploadImage(buffer: Buffer, filename: string, folder: string): Promise<string> {
-  //console.log('[ImageKit] Enviando imagem:', filename);
   
   // Comprime a imagem para no máximo 10KB
   const maxSizeKB = 20;
@@ -96,7 +93,7 @@ export async function uploadImage(buffer: Buffer, filename: string, folder: stri
 export async function deleteImages(fileIds: string[]): Promise<void> {
   for (const fileId of fileIds) {
     try {
-      await imagekit.deleteFile(fileId);
+      await imagekit.deleteFile(fileId);      
       //console.log(`[ImageKit] Imagem com ID ${fileId} deletada com sucesso.`);
     } catch (error) {
       console.error(`[ImageKit] Erro ao deletar imagem com ID ${fileId}:`, error);
@@ -141,24 +138,26 @@ export async function processAndUploadImage(imageField: any, folder: string): Pr
   }
 } 
 
-export async function processAndUploadImageBase64(base64: any, filename: string, folder: string): Promise<{ fileId: string; filePath: string; url: string } | null> {
+export async function processAndUploadImageBase64(base64: any, folder: string): Promise<{ fileId: string; filePath: string; url: string } | null> {
   if (!base64) return null;
-
-  console.log(filename)
 
   try {
     const dataUri = `data:${base64.mimetype};base64,${base64}`;
 
-    const imageUrl = await imagekit.upload({
+    const image = await imagekit.upload({
       file: dataUri,
-      fileName: filename,
+      fileName: new Date().getTime().toString(),
       folder: folder,
       useUniqueFileName: false, 
     });
 
-    console.log(imageUrl)
+    await imagekit.renameFile({
+      filePath: image.filePath,
+      newFileName: `${image.fileId}`,
+      purgeCache: false, // optional
+    });
 
-    return imageUrl;
+    return image;
   } catch (err) {
     console.error('[processAndUploadImageBase64] Erro ao processar ou fazer upload da imagem:', err);
     throw err;

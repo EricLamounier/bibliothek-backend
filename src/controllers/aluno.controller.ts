@@ -1,7 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import pool from '../config/db';
 import { verifyJWT } from '../utils/jwt';
-import { deleteImages, processAndUploadImage } from '../utils/imagekit';
+import { deleteImages, processAndUploadImage, processAndUploadImageBase64 } from '../utils/imagekit';
 import { MultipartFile } from '@fastify/multipart';
 
 export const getAluno = async (request: FastifyRequest, reply: FastifyReply) => {
@@ -72,10 +72,9 @@ export const postAluno = async(request: FastifyRequest, reply: FastifyReply) => 
     
     const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
-    const { aluno: alunoField, image } = request.body as { aluno: { value: string }, image?: MultipartFile };
-    const aluno = JSON.parse(alunoField.value); 
+    const aluno = request.body as any;
 
-    let imageUrl = null
+    let imagemImageKit = null
     try{
         if(!token){
             return reply.status(401).send({ message: 'Token not found!' });
@@ -87,9 +86,9 @@ export const postAluno = async(request: FastifyRequest, reply: FastifyReply) => 
             return reply.status(401).send({ message: 'Expired section!', data: ''});
         }
 
-        if (image) {
+        if (aluno.imagemBase64) {
             try {
-                imageUrl = await processAndUploadImage(image, '/PessoasImagens');
+                imagemImageKit = await processAndUploadImageBase64(aluno.imagemBase64, '/PessoasImagens');
             } catch (err) {
                 return reply.status(500).send({ message: 'Failed to upload image', error: err });
             }
@@ -97,7 +96,7 @@ export const postAluno = async(request: FastifyRequest, reply: FastifyReply) => 
 
         await pool.query('BEGIN');
         
-        const dataPessoa = [aluno.nome, aluno.contato, aluno.observacao, imageUrl, 0];
+        const dataPessoa = [aluno.nome, aluno.contato, aluno.observacao, imagemImageKit?.fileId, 0];
         const queryPessoa = `INSERT INTO PESSOA (NOME, CONTATO, OBSERVACAO, IMAGEM, TIPOPESSOA)
                             VALUES ($1, $2, $3, $4, $5) RETURNING *`;
         const {rows: [pessoaRow]} = await pool.query(queryPessoa, dataPessoa);
@@ -118,7 +117,7 @@ export const postAluno = async(request: FastifyRequest, reply: FastifyReply) => 
         reply.status(200).send({ message: 'Aluno inserted successfully!', data:  createdData});
     }catch(err : any){
         await pool.query('ROLLBACK');
-        imageUrl && await deleteImages([imageUrl])
+        imagemImageKit && await deleteImages([imagemImageKit?.fileId])
         reply.status(500).send({ message: 'Aluno not inserted!', data: err, errorMessage: err?.message });
     }
 };
@@ -126,9 +125,9 @@ export const postAluno = async(request: FastifyRequest, reply: FastifyReply) => 
 export const putAluno = async (request: FastifyRequest, reply: FastifyReply) => {
     const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
-    const { aluno: alunoField, image } = request.body as { aluno: { value: string }, image?: MultipartFile };
-    const aluno = JSON.parse(alunoField.value);
+    const aluno = request.body as any;
 
+    let imagemImageKit = null;
     try{
 
         if(!token){
@@ -141,21 +140,14 @@ export const putAluno = async (request: FastifyRequest, reply: FastifyReply) => 
             return reply.status(401).send({ message: 'Expired section!', data: ''});
         }
 
-        let imagemUrl = null;
-        let imageID = null;
         const queryImagem = 'SELECT IMAGEM FROM PESSOA WHERE CODIGOPESSOA = $1 LIMIT 1';
         const { rows: [imagemBDId] } = await pool.query(queryImagem, [aluno.codigopessoa]);
 
-        if(image){ // Imagem foi enviada
+        if(aluno.imagemBase64){ // Imagem foi enviada
             if (imagemBDId.imagem) await deleteImages([imagemBDId.imagem]);
 
             // Envio nova imagem
-            imageID = await processAndUploadImage(image, '/PessoasImagens');
-
-            // Crio URL com a nova imagem
-            imagemUrl = imageID ? imageID : null
-
-
+            imagemImageKit = await processAndUploadImageBase64(aluno.imagemBase64, '/PessoasImagens');
         }else{ // Imagem não foi enviada
 
             if(aluno.imageChanged == 2) { // Imagem prévia removida
@@ -165,14 +157,12 @@ export const putAluno = async (request: FastifyRequest, reply: FastifyReply) => 
                     await pool.query(queryImagem, [null, aluno.codigopessoa, ]);
                     await deleteImages([imagemBDId.imagem]);
                 }
-            }else{ // Não alterou a imagem prévia
-                imagemUrl = imagemBDId.imagem ? imagemBDId.imagem : null;
             }
         }
 
         await pool.query('BEGIN');
         const queryPessoa = "UPDATE PESSOA SET NOME = $1, CONTATO = $2, IMAGEM = COALESCE($3, IMAGEM), OBSERVACAO = $4, SITUACAO = $5 WHERE CODIGOPESSOA = $6";
-        const data = [aluno.nome, aluno.contato, imageID, aluno.observacao, aluno.situacao, aluno.codigopessoa];
+        const data = [aluno.nome, aluno.contato, imagemImageKit?.fileId, aluno.observacao, aluno.situacao, aluno.codigopessoa];
         await pool.query(queryPessoa, data);
 
         const queryAluno = `UPDATE ALUNO 
@@ -186,7 +176,7 @@ export const putAluno = async (request: FastifyRequest, reply: FastifyReply) => 
 
         const updatedAluno = {
             ...aluno,
-            imagem: imagemUrl,
+            imagem: imagemImageKit?.fileId,
             sync: 0,
         }
 
@@ -195,6 +185,7 @@ export const putAluno = async (request: FastifyRequest, reply: FastifyReply) => 
         reply.status(200).send({ message: 'Aluno updated successfully!', data:  updatedAluno});
     }catch(err : any){
         await pool.query('ROLLBACK');
+        imagemImageKit && await deleteImages([imagemImageKit?.fileId])
         reply.status(500).send({ message: 'Aluno not updated!', data: err, errorMessage: err?.message });
     }
 };

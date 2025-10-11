@@ -2,8 +2,7 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import pool from '../config/db';
 import { verifyJWT, hashPassword } from '../utils/jwt';
 import { sendEmails, generateTempPassword } from '../gmail/gmail';
-import { deleteImages, processAndUploadImage, processAndUploadImageBase64 } from '../utils/imagekit';
-import { MultipartFile } from '@fastify/multipart';
+import { deleteImages, processAndUploadImageBase64 } from '../utils/imagekit';
 
 export const getFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
     const { funcionario, privilegio, situacao } = request.query as { funcionario?: number, privilegio?: string, situacao?: string };
@@ -64,8 +63,6 @@ export const getFuncionario = async (request: FastifyRequest, reply: FastifyRepl
         GROUP BY PES.CODIGOPESSOA, PES.NOME, PES.CONTATO, FUN.CODIGOFUNCIONARIO
     `;
 
-    //console.log(query, values)
-
     const { rows : funcionarios } = await pool.query(query, values);
 
     reply.status(200).send({ message: 'Funcionarios fetched successfully!', data: funcionarios });
@@ -75,10 +72,9 @@ export const postFuncionario = async(request: FastifyRequest, reply: FastifyRepl
     
     const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
-    const { funcionario: funcionarioField, image } = request.body as { funcionario: any, image?: MultipartFile };
-    const funcionario = JSON.parse(funcionarioField);
+    const funcionario = request.body as any ;
 
-    let imageUrl = null
+    let imagemImageKit = null
     try{
         if(!token){
             return reply.status(401).send({ message: 'Token not found!' });
@@ -94,28 +90,19 @@ export const postFuncionario = async(request: FastifyRequest, reply: FastifyRepl
         if (funcionarioRequest.tipopessoa !== 2 || Number(funcionarioRequest.privilegio) !== 999) {
             return reply.status(401).send({ message: 'Funcionário sem privilégio para criar outros funcionários!', data: ''});
         }
-
-        /*if (image) {
+        
+        if(funcionario.imagemBase64){
             try {
-                imagemImageKit = await processAndUploadImage(image, '/PessoasImagens');
+                imagemImageKit = await processAndUploadImageBase64(funcionario.imagemBase64, '/PessoasImagens');
             } catch (err) {
                 console.log(err)
                 return reply.status(500).send({ message: 'Failed to upload image', error: err });
             }
-        }*/
-        let imagemImageKit = null
-       if(funcionario.imagemBase64){
-           try {
-               imagemImageKit = await processAndUploadImageBase64(funcionario.imagemBase64, funcionario.codigopessoa, '/PessoasImagens');
-           } catch (err) {
-               console.log(err)
-               return reply.status(500).send({ message: 'Failed to upload image', error: err });
-           }
-       }
+        }
 
         await pool.query('BEGIN');
         
-        const dataPessoa = [funcionario.nome, funcionario.contato, funcionario.observacao, imagemImageKit?.url, 2];
+        const dataPessoa = [funcionario.nome, funcionario.contato, funcionario.observacao, imagemImageKit?.fileId, 2];
         const queryPessoa = `INSERT INTO PESSOA (NOME, CONTATO, OBSERVACAO, IMAGEM, TIPOPESSOA)
                             VALUES ($1, $2, $3, $4, $5) RETURNING *`;
         const {rows: [pessoaRow]} = await pool.query(queryPessoa, dataPessoa);
@@ -142,7 +129,7 @@ export const postFuncionario = async(request: FastifyRequest, reply: FastifyRepl
     }catch(err : any){
         await pool.query('ROLLBACK');
         console.log(err)
-        imageUrl && await deleteImages([imageUrl])
+        imagemImageKit && await deleteImages([imagemImageKit?.fileId])
         reply.status(500).send({ message: 'Funcionario not inserted!', data: err, errorMessage: err?.message });
     }
 };
@@ -150,8 +137,8 @@ export const postFuncionario = async(request: FastifyRequest, reply: FastifyRepl
 export const putFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
     const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
-    const { funcionario: funcionarioField, image } = request.body as { funcionario: any, image?: MultipartFile };
-    const funcionario = JSON.parse(funcionarioField);
+    const { funcionario } = request.body as { funcionario: any };
+    let imagemImageKit = null;
 
     try{
 
@@ -170,60 +157,29 @@ export const putFuncionario = async (request: FastifyRequest, reply: FastifyRepl
             return reply.status(401).send({ message: 'Funcionário sem privilégio para editar outros funcionários!', data: ''});
         }
 
-        let imagemUrl = null;
-        let imageID = null;
-        let imagemImageKit = null;
         const queryImagem = 'SELECT IMAGEM FROM PESSOA WHERE CODIGOPESSOA = $1 LIMIT 1';
         const { rows: [imagemBDId] } = await pool.query(queryImagem, [funcionario.codigopessoa]);
-
-        /*if(image){ // Imagem foi enviada
-            if (imagemBDId.imagem) await deleteImages([imagemBDId.imagem]);
-
-            // Envio nova imagem
-            imageID = await processAndUploadImage(image, '/PessoasImagens');
-
-            // Crio URL com a nova imagem
-            imagemUrl = imageID
-
-        }else{ // Imagem não foi enviada
-            if(funcionario.imageChanged == 2) { // Imagem prévia removida
-                // Remove imagem do banco e deleta do ImageKit
-                if(imagemBDId.imagem){ // tem imagem no banco
-                    const queryImagem = 'UPDATE PESSOA SET IMAGEM = $1 WHERE CODIGOPESSOA = $2';
-                    await pool.query(queryImagem, [null, funcionario.codigopessoa]);
-                    await deleteImages([imagemBDId.imagem]);
-                }
-            }else{ // Não alterou a imagem prévia
-                imagemUrl = imagemBDId.imagem ? imagemBDId.imagem : null;
-            }
-        }*/
 
         if(funcionario.imagemBase64){ // Imagem foi enviada
             if (imagemBDId.imagem) await deleteImages([imagemBDId.imagem]);
 
             // Envio nova imagem
-            imagemImageKit = await processAndUploadImageBase64(funcionario.imagemBase64, funcionario.codigopessoa, '/PessoasImagens');
-
-            // Crio URL com a nova imagem
-            imagemUrl = imagemImageKit?.url
-            console.log(imagemImageKit)
+            imagemImageKit = await processAndUploadImageBase64(funcionario.imagemBase64, '/PessoasImagens');
 
         }else{ // Imagem não foi enviada
             if(funcionario.imageChanged == 2) { // Imagem prévia removida
                 // Remove imagem do banco e deleta do ImageKit
                 if(imagemBDId.imagem){ // tem imagem no banco
                     const queryImagem = 'UPDATE PESSOA SET IMAGEM = $1 WHERE CODIGOPESSOA = $2';
-                    await pool.query(queryImagem, [null, funcionario.codigopessoa]);
-                    await deleteImages([imagemBDId.imagem]);
+                    await pool.query(queryImagem, [null, imagemBDId.fileId]);
+                    await deleteImages([imagemBDId.fileId]);
                 }
-            }else{ // Não alterou a imagem prévia
-                imagemUrl = imagemBDId.imagem ? imagemBDId.imagem : null;
             }
         }
 
         await pool.query('BEGIN');
         const queryPessoa = "UPDATE PESSOA SET NOME = $1, CONTATO = $2, IMAGEM = COALESCE($3, IMAGEM), OBSERVACAO = $4, SITUACAO = $5 WHERE CODIGOPESSOA = $6";
-        const data = [funcionario.nome, funcionario.contato, imageID, funcionario.observacao, funcionario.situacao, funcionario.codigopessoa];
+        const data = [funcionario.nome, funcionario.contato, imagemImageKit?.fileId, funcionario.observacao, funcionario.situacao, funcionario.codigopessoa];
         await pool.query(queryPessoa, data);
 
         const queryFuncionario = `UPDATE FUNCIONARIO 
@@ -238,7 +194,7 @@ export const putFuncionario = async (request: FastifyRequest, reply: FastifyRepl
 
         const updatedFuncionario = {
             ...funcionario,
-            imagem: imagemUrl
+            imagem: imagemImageKit?.fileId
         }
 
         await pool.query('COMMIT');
@@ -246,7 +202,59 @@ export const putFuncionario = async (request: FastifyRequest, reply: FastifyRepl
         reply.status(200).send({ message: 'Funcionario updated successfully!', data:  updatedFuncionario});
     }catch(err : any){
         await pool.query('ROLLBACK');
+        imagemImageKit && await deleteImages([imagemImageKit?.fileId])      
         reply.status(500).send({ message: 'Funcionario not updated!', data: err, errorMessage: err?.message });
+    }
+};
+
+export const deleteFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
+    const { codigopessoa } = request.query as {codigopessoa : number};
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
+    try{
+        if(!codigopessoa){
+            return reply.status(400).send({ message: "Funcionario's ID required!" })
+        }
+
+        if(!token){
+            return reply.status(401).send({ message: 'Token not found!' });
+        }
+
+        const res = await verifyJWT(token);
+
+        if(!res){
+            return reply.status(401).send({ message: 'Expired section!', data: ''});
+        }
+
+        const funcionarioRequest = res.funcionario;
+        if (funcionarioRequest.tipopessoa !== 2 || Number(funcionarioRequest.privilegio) !== 999) {
+            return reply.status(401).send({ message: 'Funcionário sem privilégio para excluir outros funcionários!', data: ''});
+        }
+        
+        if(funcionarioRequest.codigopessoa == codigopessoa){
+            return reply.status(401).send({ message: 'Funcionário não pode excluir ele mesmo!', data: ''});
+        }
+
+        await pool.query('BEGIN');
+
+        const data = [codigopessoa];
+
+        const queryImagem = 'SELECT IMAGEM FROM PESSOA WHERE CODIGOPESSOA = $1 LIMIT 1';
+        const { rows: [imagemId] } = await pool.query(queryImagem, data);
+
+        const queryFuncionario = 'DELETE FROM FUNCIONARIO WHERE CODIGOPESSOA = $1';
+        const queryPessoa = 'DELETE FROM PESSOA WHERE CODIGOPESSOA = $1';
+        
+        await pool.query(queryFuncionario, data);
+        await pool.query(queryPessoa, data);
+
+        imagemId.imagem && await deleteImages([imagemId.imagem])
+
+        await pool.query('COMMIT');
+
+        reply.status(200).send({ message: 'Funcionario deleted successfully!', data:  codigopessoa});
+    }catch(err : any){
+        await pool.query('ROLLBACK');
+        reply.status(200).send({ message: 'Funcionario not deleted!', data: err, errorMessage: err?.message });
     }
 };
 
@@ -290,58 +298,5 @@ export const resetSenhaFuncionario = async (request: FastifyRequest, reply: Fast
         //console.log(err)
         await pool.query('ROLLBACK');
         reply.status(500).send({ message: 'Funcionario not updated!', data: err, errorMessage: err?.message });
-    }
-};
-
-export const deleteFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { codigopessoa } = request.query as {codigopessoa : number};
-    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
-    try{
-        if(!codigopessoa){
-            return reply.status(400).send({ message: "Funcionario's ID required!" })
-        }
-
-        if(!token){
-            return reply.status(401).send({ message: 'Token not found!' });
-        }
-
-        const res = await verifyJWT(token);
-
-        if(!res){
-            return reply.status(401).send({ message: 'Expired section!', data: ''});
-        }
-
-        const funcionarioRequest = res.funcionario;
-        if (funcionarioRequest.tipopessoa !== 2 || Number(funcionarioRequest.privilegio) !== 999) {
-            return reply.status(401).send({ message: 'Funcionário sem privilégio para excluir outros funcionários!', data: ''});
-        }
-        
-        console.log(funcionarioRequest.codigopessoa, codigopessoa)
-
-        if(funcionarioRequest.codigopessoa == codigopessoa){
-            return reply.status(401).send({ message: 'Funcionário não pode excluir ele mesmo!', data: ''});
-        }
-
-        await pool.query('BEGIN');
-
-        const data = [codigopessoa];
-
-        const queryImagem = 'SELECT IMAGEM FROM PESSOA WHERE CODIGOPESSOA = $1 LIMIT 1';
-        const { rows: [imagemId] } = await pool.query(queryImagem, data);
-
-        const queryFuncionario = 'DELETE FROM FUNCIONARIO WHERE CODIGOPESSOA = $1';
-        const queryPessoa = 'DELETE FROM PESSOA WHERE CODIGOPESSOA = $1';
-        
-        await pool.query(queryFuncionario, data);
-        await pool.query(queryPessoa, data);
-
-        imagemId.imagem && await deleteImages([imagemId.imagem])
-
-        await pool.query('COMMIT');
-
-        reply.status(200).send({ message: 'Funcionario deleted successfully!', data:  codigopessoa});
-    }catch(err : any){
-        await pool.query('ROLLBACK');
-        reply.status(200).send({ message: 'Funcionario not deleted!', data: err, errorMessage: err?.message });
     }
 };

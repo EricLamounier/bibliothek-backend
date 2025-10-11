@@ -1,7 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import pool from '../config/db';
 import { verifyJWT } from '../utils/jwt';
-import { deleteImages, processAndUploadImage } from '../utils/imagekit';
+import { deleteImages, processAndUploadImage, processAndUploadImageBase64 } from '../utils/imagekit';
 import { MultipartFile } from '@fastify/multipart';
 
 export const getProfessor = async (request: FastifyRequest, reply: FastifyReply) => {
@@ -110,8 +110,7 @@ export const getProfessor = async (request: FastifyRequest, reply: FastifyReply)
 export const postProfessor = async (request: FastifyRequest, reply: FastifyReply) => {
     const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
   
-    // request.body agora é um array de formData
-    const formData = request.body as { professor: { value: string }, image?: MultipartFile };
+    const professor = request.body as any;
   
     if (!token) {
       return reply.status(401).send({ message: 'Token not found!' });
@@ -121,17 +120,15 @@ export const postProfessor = async (request: FastifyRequest, reply: FastifyReply
     if (!res) {
       return reply.status(401).send({ message: 'Expired session!', data: '' });
     }
+
+    let imagemImageKit = null;
   
     try {
         await pool.query('BEGIN');
 
-        const { professor: professorField, image } = formData;
-        const professor = JSON.parse(professorField.value);
-        let imageUrl: string | null = null;
-
-        if (image) {
+        if (professor.imagemBase64) {
             try {
-            imageUrl = await processAndUploadImage(image, '/PessoasImagens');
+            imagemImageKit = await processAndUploadImageBase64(professor.imagemBase64, '/PessoasImagens');
             } catch (err) {
             await pool.query('ROLLBACK');
             return reply.status(500).send({ message: 'Failed to upload image', error: err });
@@ -139,7 +136,7 @@ export const postProfessor = async (request: FastifyRequest, reply: FastifyReply
         }
 
         // Inserção em PESSOA
-        const dataPessoa = [professor.nome, professor.contato, imageUrl, professor.observacao, 1];
+        const dataPessoa = [professor.nome, professor.contato, imagemImageKit?.fileId, professor.observacao, 1];
         const queryPessoa = `INSERT INTO PESSOA (NOME, CONTATO, IMAGEM, OBSERVACAO, TIPOPESSOA)
                                 VALUES ($1, $2, $3, $4, $5) RETURNING *`;
         const { rows: [pessoaRow] } = await pool.query(queryPessoa, dataPessoa);
@@ -177,6 +174,7 @@ export const postProfessor = async (request: FastifyRequest, reply: FastifyReply
     } catch (err) {
       console.log(err)
       await pool.query('ROLLBACK');
+      imagemImageKit && await deleteImages([imagemImageKit.fileId]);
       reply.status(500).send({ message: 'Erro ao inserir professores!', data: err });
     }
   };  
@@ -184,8 +182,8 @@ export const postProfessor = async (request: FastifyRequest, reply: FastifyReply
 export const putProfessor = async (request: FastifyRequest, reply: FastifyReply) => {
     const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
     
-    const { professor: professorField, image } = request.body as { professor: { value: string }, image?: MultipartFile };
-    const professor = JSON.parse(professorField.value);
+    const professor = request.body as any;
+    let imagemImageKit = null;
 
     try{
 
@@ -204,16 +202,11 @@ export const putProfessor = async (request: FastifyRequest, reply: FastifyReply)
         const queryImagem = 'SELECT IMAGEM FROM PESSOA WHERE CODIGOPESSOA = $1 LIMIT 1';
         const { rows: [imagemBDId] } = await pool.query(queryImagem, [professor.codigopessoa]);
 
-        if(image){ // Imagem foi enviada
+        if(professor.imagemBase64){ // Imagem foi enviada
             if (imagemBDId.imagem) await deleteImages([imagemBDId.imagem]);
 
             // Envio nova imagem
-            imageID = await processAndUploadImage(image, '/PessoasImagens');
-
-            // Crio URL com a nova imagem
-            imagemUrl = imageID ? imageID : null
-
-
+            imagemImageKit = await processAndUploadImageBase64(professor.imagemBase64, '/PessoasImagens');
         }else{ // Imagem não foi enviada
 
             if(professor.imageChanged == 2) { // Imagem prévia removida
@@ -223,14 +216,12 @@ export const putProfessor = async (request: FastifyRequest, reply: FastifyReply)
                     await pool.query(queryImagem, [null, professor.codigopessoa]);
                     await deleteImages([imagemBDId.imagem]);
                 }
-            }else{ // Não alterou a imagem prévia
-                imagemUrl = imagemBDId.imagem ? imagemBDId.imagem : null;
             }
         }
 
         await pool.query('BEGIN');
         const queryPessoa = `UPDATE PESSOA SET NOME = $1, CONTATO = $2, IMAGEM = COALESCE($3, IMAGEM), OBSERVACAO = $4, SITUACAO = $5 WHERE CODIGOPESSOA = $6`;
-        const data = [professor.nome, professor.contato, imagemUrl, professor.observacao, professor.situacao, professor.codigopessoa];
+        const data = [professor.nome, professor.contato, imagemImageKit?.fileId, professor.observacao, professor.situacao, professor.codigopessoa];
         await pool.query(queryPessoa, data);
 
         const queryProfessor = "UPDATE PROFESSOR SET IDENTIFICADOR = $1 WHERE CODIGOPROFESSOR = $2";
@@ -270,7 +261,7 @@ export const putProfessor = async (request: FastifyRequest, reply: FastifyReply)
 
         const updatedProfessor = {
             ...professor,
-            imagem: imagemUrl,
+            imagem: imagemImageKit?.fileId,
             disciplinas: disciplinas,
             sync: 0,
         }
@@ -280,6 +271,7 @@ export const putProfessor = async (request: FastifyRequest, reply: FastifyReply)
     }catch(err){
         console.log(err)
         await pool.query('ROLLBACK');
+        imagemImageKit && await deleteImages([imagemImageKit.fileId]);
         reply.status(500).send({ message: 'Professor not updated!', data: err });
     }
 };

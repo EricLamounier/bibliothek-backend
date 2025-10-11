@@ -1,7 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import pool from '../config/db';
 import { verifyJWT } from '../utils/jwt';
-import { deleteImages, processAndUploadImage } from '../utils/imagekit';
+import { deleteImages, processAndUploadImage, processAndUploadImageBase64 } from '../utils/imagekit';
 import { MultipartFile } from '@fastify/multipart';
 
 export const getLivro = async (request: FastifyRequest, reply: FastifyReply) => {
@@ -113,11 +113,10 @@ export const getLivro = async (request: FastifyRequest, reply: FastifyReply) => 
 
 export const postLivro = async(request: FastifyRequest, reply: FastifyReply) => {
 
-    const { livro: livroField, image } = request.body as { livro: { value: string }, image?: MultipartFile };
+    const livro = request.body as any;
     const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
-    const livro = JSON.parse(livroField.value);
-    let imageUrl = null
+    let imagemImageKit = null
 
     try {
         if (!livro.titulo) {
@@ -134,9 +133,9 @@ export const postLivro = async(request: FastifyRequest, reply: FastifyReply) => 
             return reply.status(401).send({ message: 'Expired section!', data: ''});
         }
 
-        if (image) {
+        if (livro.imagemBase64) {
             try {
-                imageUrl = await processAndUploadImage(image, '/LivrosImagens');
+                imagemImageKit = await processAndUploadImageBase64(livro.imagemBase64, '/LivrosImagens');
             } catch (err) {
                 return reply.status(500).send({ message: 'Failed to upload image', error: err });
             }
@@ -159,7 +158,7 @@ export const postLivro = async(request: FastifyRequest, reply: FastifyReply) => 
             livro.localizacao,
             livro.observacao.slice(0, 100),
             livro.codigoeditora,
-            imageUrl
+            imagemImageKit?.fileId
         ];
         
         const { rows: [insertedBook] } = await pool.query(queryLivro, dataLivro);
@@ -201,7 +200,7 @@ export const postLivro = async(request: FastifyRequest, reply: FastifyReply) => 
             localizacao: insertedBook.localizacao,
             observacao: insertedBook.observacao,
             situacao: insertedBook.situacao || 0,
-            imagem: imageUrl,
+            imagem: imagemImageKit?.fileId,
             sync: 0,
             codigolivrotemp: livro.codigolivro
         };
@@ -211,17 +210,17 @@ export const postLivro = async(request: FastifyRequest, reply: FastifyReply) => 
 
     } catch(err : any) {
         await pool.query('ROLLBACK');
-        console.log(err)
-        imageUrl && await deleteImages([imageUrl])
+        imagemImageKit && await deleteImages([imagemImageKit?.fileId])
         reply.status(500).send({ message: 'Livro not inserted!', data: err, errorMessage: err?.message });
     }
 }
 
 export const putLivro = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { livro: livroField, image } = request.body as { livro: { value: string }, image?: MultipartFile };
+    const livro = request.body as any;
     const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
-    const livro = JSON.parse(livroField.value);
+    let imagemImageKit = null;
+
     try{
         if(!livro){
             return reply.status(400).send({ message: "Livro's ID required!" });
@@ -242,17 +241,11 @@ export const putLivro = async (request: FastifyRequest, reply: FastifyReply) => 
         const queryImagem = 'SELECT IMAGEM FROM LIVRO WHERE CODIGOLIVRO = $1 LIMIT 1';
         const { rows: [imagemBDId] } = await pool.query(queryImagem, [livro.codigolivro]);
 
-        let imagemUrl = null;
-        let imageID = null;
-        if(image){ // Imagem foi enviada
+        if(livro.imagemBase64){ // Imagem foi enviada
             if (imagemBDId.imagem) await deleteImages([imagemBDId.imagem]);
 
             // Envio nova imagem
-            imageID = await processAndUploadImage(image, '/LivrosImagens');
-
-            // Crio URL com a nova imagem
-            imagemUrl = imageID
-
+            imagemImageKit = await processAndUploadImageBase64(livro.imagemBase64, '/LivrosImagens');
 
         }else{ // Imagem não foi enviada
 
@@ -263,8 +256,6 @@ export const putLivro = async (request: FastifyRequest, reply: FastifyReply) => 
                     await pool.query(queryImagem, [null, livro.codigolivro]);
                     await deleteImages([imagemBDId.imagem]);
                 }
-            }else{ // Não alterou a imagem prévia
-                imagemUrl = imagemBDId.imagem;
             }
         }
 
@@ -277,7 +268,7 @@ export const putLivro = async (request: FastifyRequest, reply: FastifyReply) => 
             livro.observacao.slice(0, 100),
             livro.codigoeditora,
             livro.situacao,
-            imageID,
+            imagemImageKit?.fileId,
             livro.codigolivro,
         ];
 
@@ -328,7 +319,7 @@ export const putLivro = async (request: FastifyRequest, reply: FastifyReply) => 
             autores: livro.autores = livro.autores
                 .filter((autor: any) => autor.sync !== 2)
                 .map((autor: any) => ({ ...autor, sync: 0 })),
-            imagem: imagemUrl,
+            imagem: imagemImageKit?.fileId,
             sync: 0,
         }
 
