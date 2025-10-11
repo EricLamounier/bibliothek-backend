@@ -7,7 +7,7 @@ import { MultipartFile } from '@fastify/multipart';
 
 export const getFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
     const { funcionario, privilegio, situacao } = request.query as { funcionario?: number, privilegio?: string, situacao?: string };
-    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     if(!token){
         return reply.code(401).send({ error: "Token not found!" });
@@ -73,10 +73,11 @@ export const getFuncionario = async (request: FastifyRequest, reply: FastifyRepl
 
 export const postFuncionario = async(request: FastifyRequest, reply: FastifyReply) => {
     
-    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
-    const { funcionario: funcionarioField, image } = request.body as { funcionario: { value: string }, image?: MultipartFile };
-    const funcionario = JSON.parse(funcionarioField.value);
+    const { funcionario: funcionarioField, image } = request.body as { funcionario: any, image?: MultipartFile };
+    const funcionario = JSON.parse(funcionarioField);
+
 
     let imageUrl = null
     try{
@@ -91,8 +92,6 @@ export const postFuncionario = async(request: FastifyRequest, reply: FastifyRepl
         }
 
         const funcionarioRequest = res.funcionario;
-        console.log(funcionarioRequest)
-        console.log(res)
         if (funcionarioRequest.tipopessoa !== 2 || Number(funcionarioRequest.privilegio) !== 999) {
             return reply.status(401).send({ message: 'Funcionário sem privilégio para criar outros funcionários!', data: ''});
         }
@@ -101,7 +100,7 @@ export const postFuncionario = async(request: FastifyRequest, reply: FastifyRepl
             try {
                 imageUrl = await processAndUploadImage(image, '/PessoasImagens');
             } catch (err) {
-                //console.log(err)
+                console.log(err)
                 return reply.status(500).send({ message: 'Failed to upload image', error: err });
             }
         }
@@ -134,13 +133,14 @@ export const postFuncionario = async(request: FastifyRequest, reply: FastifyRepl
         reply.status(200).send({ message: 'Funcionario inserted successfully!', data:  formatedFuncionario});
     }catch(err : any){
         await pool.query('ROLLBACK');
+        console.log(err)
         imageUrl && await deleteImages([imageUrl])
         reply.status(500).send({ message: 'Funcionario not inserted!', data: err, errorMessage: err?.message });
     }
 };
 
 export const putFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
-    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     const { funcionario: funcionarioField, image } = request.body as { funcionario: { value: string }, image?: MultipartFile };
     const funcionario = JSON.parse(funcionarioField.value);
@@ -221,7 +221,7 @@ export const putFuncionario = async (request: FastifyRequest, reply: FastifyRepl
 
 export const resetSenhaFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
     const { funcionario} = request.body as {funcionario : any}; 
-    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     if(!token){
         return reply.code(401).send({ error: "Token not found!" });
@@ -264,7 +264,7 @@ export const resetSenhaFuncionario = async (request: FastifyRequest, reply: Fast
 
 export const deleteFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
     const { codigopessoa } = request.query as {codigopessoa : number};
-    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
     try{
         if(!codigopessoa){
             return reply.status(400).send({ message: "Funcionario's ID required!" })

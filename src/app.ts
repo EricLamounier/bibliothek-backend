@@ -19,6 +19,7 @@ import fs from 'fs';
 import syncRoutes from './routes/sync';
 
 
+
 const app = Fastify({
   logger: {
     level: 'warn', // Apenas logs de warning ou erro
