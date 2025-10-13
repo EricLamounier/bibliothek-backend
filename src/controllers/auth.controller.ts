@@ -42,7 +42,7 @@ export const authLogin = async (request: FastifyRequest, reply: FastifyReply) =>
 };
 
 export const authJWT = async(request: FastifyRequest, reply: FastifyReply) => {
-    const token = request.cookies.token;
+    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
     try{
         if(!token){
             return reply.status(401).send({ message: 'Token not found!' });
