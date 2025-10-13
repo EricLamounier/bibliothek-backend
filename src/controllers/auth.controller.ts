@@ -43,27 +43,35 @@ export const authLogin = async (request: FastifyRequest, reply: FastifyReply) =>
 
 export const authJWT = async(request: FastifyRequest, reply: FastifyReply) => {
     const token = request.cookies.token;
-    if(!token){
-        return reply.status(401).send({ message: 'Token not found!' });
-    }
-    const resp = await verifyJWT(token)
-
-    if(resp){
-        const query = `
-            SELECT 
-                FUN.*,
-                PES.*
-            FROM PESSOA PES JOIN FUNCIONARIO FUN ON PES.CODIGOPESSOA = FUN.CODIGOPESSOA
-            WHERE PES.TIPOPESSOA = 2 AND FUN.CODIGOPESSOA = $1 LIMIT 1
-        `
-        const data = resp.funcionario.codigopessoa
-        const result = await pool.query(query, [data])
-        const funcionario = result.rows[0]
-        const { senha, ...funcionarioFormated } = funcionario;
-
-        reply.status(200).send({ message: 'Logged successfully!', data: funcionarioFormated });
-    }else{
-        reply.status(401).send({ message: 'Invalid JWT Token!' });
+    try{
+        if(!token){
+            return reply.status(401).send({ message: 'Token not found!' });
+        }
+        const resp = await verifyJWT(token)
+    
+        if(resp){
+            const query = `
+                SELECT 
+                    FUN.*,
+                    PES.*
+                FROM PESSOA PES JOIN FUNCIONARIO FUN ON PES.CODIGOPESSOA = FUN.CODIGOPESSOA
+                WHERE PES.TIPOPESSOA = 2 AND FUN.CODIGOPESSOA = $1 LIMIT 1
+            `
+            const data = resp.funcionario.codigopessoa
+            const result = await pool.query(query, [data])
+            const funcionario = result.rows[0]
+            const { senha, ...funcionarioFormated } = funcionario;
+    
+            reply.status(200).send({ message: 'Logged successfully!', data: funcionarioFormated });
+        }else{
+            console.log('Invalid JWT Token!');
+            console.log(token)
+            reply.status(401).send({ message: 'Invalid JWT Token!' });
+        }
+    }catch(err){
+        console.log(err)
+        console.log(token)
+        reply.code(400).send({ message: 'Something went wrong!', data: err});
     }
 };
 
@@ -89,6 +97,7 @@ export const authRegister = async (request: FastifyRequest, reply: FastifyReply)
     
         reply.code(201).send({ message: "Registered succesfully!", data: row.rows[0] });
     }catch(err){
+        console.log(err)
         reply.code(400).send({ message: "Something went wrong!", data: err });
     }
 };
