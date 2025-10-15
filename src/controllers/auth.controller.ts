@@ -20,7 +20,7 @@ export const authLogin = async (request: FastifyRequest, reply: FastifyReply) =>
         }
 
         if(! await comparePassword(password, rows[0].senha)){
-            return reply.code(401).send({ error: "Usuário ou senha incorretos!" });
+            return reply.code(401).send({ error: "E-mail ou senha incorretos!" });
         }
 
         const JWTToken = await createJWT(rows[0]);

@@ -3,7 +3,6 @@ import formbody from '@fastify/formbody';
 import cors from '@fastify/cors';
 import fastifyMultipart from '@fastify/multipart';
 import cookie from '@fastify/cookie';
-import https from 'https';
 
 import authenticationRoute from './routes/auth.route';
 import editoraRoutes from './routes/editora.route';
@@ -17,6 +16,10 @@ import emprestimoRoutes from './routes/emprestimo.route';
 import resetPasswordRoute from './routes/resetPassword.route';
 import fs from 'fs';
 import syncRoutes from './routes/sync';
+import requestLogger from './utils/requestLogger';
+import logsRoutes from './routes/logs';
+import postFeedback from './routes/feedBack';
+
 
 
 const app = Fastify({
@@ -45,6 +48,7 @@ app.register(cors, {
 });
 
 app.register(cookie);
+app.register(requestLogger);
 
 app.register(authenticationRoute, { prefix: '/auth'});
 app.register(resetPasswordRoute, { prefix: '/resetPassword'});
@@ -57,5 +61,8 @@ app.register(disciplinaRoutes, { prefix: '/disciplina'});
 app.register(livroRoutes, { prefix: '/livro'});
 app.register(emprestimoRoutes, { prefix: '/emprestimo'});
 app.register(syncRoutes, { prefix: '/sync'});
+app.register(postFeedback, { prefix: '/feedback'});
+app.register(logsRoutes, { prefix: '/admin' });
+
 
 export default app;
