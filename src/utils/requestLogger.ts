@@ -34,6 +34,7 @@ export default fp(async (fastify) => {
     const responseBody = (reply as any)._responsePayload;
 
     if (url === '/favicon.ico') return;
+    if (url === '/admin/logs') return;
     if (request.method === 'OPTIONS') return;
 
     try {
