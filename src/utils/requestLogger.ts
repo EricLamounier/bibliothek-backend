@@ -1,10 +1,12 @@
 // src/plugins/requestLogger.ts
 import fp from 'fastify-plugin';
+import dotenv from 'dotenv';
+dotenv.config();
 const { createClient } = require('@libsql/client');
 
 export const db = createClient({
-  url: process.env.TURSO_DATABASE_URL!,
-  authToken: process.env.TURSO_AUTH_TOKEN!,
+  url: process.env.TURSO_DATABASE_URL,
+  authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
 export default fp(async (fastify) => {
