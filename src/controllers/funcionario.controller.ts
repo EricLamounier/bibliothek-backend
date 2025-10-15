@@ -139,7 +139,7 @@ export const postFuncionario = async(request: FastifyRequest, reply: FastifyRepl
     }
 };
 
-export const putFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
+export const putFuncionario = async(request: FastifyRequest, reply: FastifyReply) => {
     const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     const funcionario = request.body as any;
@@ -261,12 +261,12 @@ export const deleteFuncionario = async (request: FastifyRequest, reply: FastifyR
     }catch(err : any){
         await pool.query('ROLLBACK');
         console.log(err)
-        reply.status(200).send({ message: 'Funcionario not deleted!', data: err, errorMessage: err?.message });
+        reply.status(500).send({ message: 'Funcionario not deleted!', data: err, errorMessage: err?.message });
     }
 };
 
 export const resetSenhaFuncionario = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { funcionario} = request.body as {funcionario : any}; 
+    const funcionario = request.body as any; 
     const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     if(!token){
