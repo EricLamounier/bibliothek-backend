@@ -114,10 +114,10 @@ export default async function postFeedback(app: FastifyInstance) {
     try {
         const data = request.body as any;
         const task : any = postTask({
-        title: data.descricao,
-        type: feedback[data.tipo].id,
-        priority: feedback[data.tipo].stickers[data.prioridade].id,      
-        funcionario: data.funcionario,
+            title: data.descricao,
+            type: feedback[Number(data.tipo)].id,
+            priority: feedback[Number(data.tipo)].stickers[Number(data.prioridade)].id,      
+            funcionario: data.funcionario,
         });
         reply.status(200).send({});
     } catch (error) {
