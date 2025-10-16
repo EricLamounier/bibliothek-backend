@@ -111,13 +111,18 @@ const postTask = async ({title, type, priority, funcionario}: TaskPost) => {
 
 export default async function postFeedback(app: FastifyInstance) {
   app.post('/post', async (request, reply) => {
-    const data = request.body as any;
-    const task : any = postTask({
-      title: data.descricao,
-      type: feedback[data.tipo].id,
-      priority: feedback[data.tipo].stickers[data.prioridade].id,      
-      funcionario: data.funcionario,
-    });
-    reply.status(200).send({});
+    try {
+        const data = request.body as any;
+        const task : any = postTask({
+        title: data.descricao,
+        type: feedback[data.tipo].id,
+        priority: feedback[data.tipo].stickers[data.prioridade].id,      
+        funcionario: data.funcionario,
+        });
+        reply.status(200).send({});
+    } catch (error) {
+        console.log(error)
+        reply.status(500).send({ message: 'Error creating task', error });
+    }
   });
 }
