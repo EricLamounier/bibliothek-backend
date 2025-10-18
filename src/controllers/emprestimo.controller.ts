@@ -56,6 +56,25 @@ export const getEmprestimo = async(request: FastifyRequest, reply: FastifyReply)
         let conditions: string[] = [];
         let paramIndex = 1;
 
+        if(situacao){
+            const situacoes = Array.isArray(situacao) ? situacao : [situacao];
+            const statusConditions: string[] = [];
+            
+            if(situacoes.includes('0')){ // Pendente
+                statusConditions.push(`(EL.quantidadedevolvida < EL.quantidadeemprestada)`);
+            }
+            if(situacoes.includes('1')){ // Atrasado
+                statusConditions.push(`(EL.quantidadedevolvida < EL.quantidadeemprestada AND CURRENT_DATE > EMP.DATADEVOLUCAOPREVISTA)`);
+            }
+            if(situacoes.includes('2')){ // Devolvido
+                statusConditions.push(`(EL.quantidadedevolvida = EL.quantidadeemprestada)`);
+            }
+            
+            if(statusConditions.length > 0) {
+                conditions.push(`(${statusConditions.join(' OR ')})`);
+            }
+        }        
+
         if (codigopessoa) {
             const pessoas = Array.isArray(codigopessoa) ? codigopessoa : [codigopessoa]
             const placeholders = pessoas.map((_, i) => `$${paramIndex + i}`)
@@ -89,25 +108,6 @@ export const getEmprestimo = async(request: FastifyRequest, reply: FastifyReply)
             conditions.push(`EMP.DATADEVOLUCAO <= $${paramIndex}`);
             data.push(datafimdevolucao);
             paramIndex += 1
-        }
-
-        if(situacao && situacao.length > 0){
-            const situacoes = Array.isArray(situacao) ? situacao : [situacao];
-            const statusConditions: string[] = [];
-            
-            if(situacoes.includes('0')){ // Atrasado
-                statusConditions.push(`(EMP.DATADEVOLUCAO IS NULL AND CURRENT_DATE > EMP.DATADEVOLUCAOPREVISTA)`);
-            }
-            if(situacoes.includes('1')){ // Em dia
-                statusConditions.push(`(EMP.DATADEVOLUCAO IS NULL AND CURRENT_DATE <= EMP.DATADEVOLUCAOPREVISTA)`);
-            }
-            if(situacoes.includes('2')){ // Devolvido
-                statusConditions.push(`(EMP.DATADEVOLUCAO IS NOT NULL)`);
-            }
-            
-            if(statusConditions.length > 0) {
-                conditions.push(`(${statusConditions.join(' OR ')})`);
-            }
         }
         
         if (conditions.length > 0) {

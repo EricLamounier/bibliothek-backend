@@ -113,7 +113,7 @@ export default async function postFeedback(app: FastifyInstance) {
   app.post('/post', async (request, reply) => {
     try {
         const data = request.body as any;
-        const task : any = postTask({
+        const task : any = await postTask({
             title: data.descricao,
             type: feedback[Number(data.tipo)].id,
             priority: feedback[Number(data.tipo)].stickers[Number(data.prioridade)].id,      
