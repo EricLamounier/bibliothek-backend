@@ -24,7 +24,30 @@ const app = Fastify({
   logger: {
     level: 'warn', // Apenas logs de warning ou erro
   },
-  //https: httpsOptions
+});
+
+const allowedOrigins = [
+  "https://bibliothek-test.vercel.app", // produção
+  "http://192.168.3.9:5173",            // dev local
+  "https://192.168.3.9:5173"
+];
+
+app.addHook("onRequest", (req, reply, done) => {
+  const origin = req.headers.origin;
+
+  // Bloqueia navegação direta (sem header Origin)
+  if (!origin) {
+    reply.code(403).send({ error: "Forbidden" });
+    return;
+  }
+
+  // Bloqueia qualquer origin NÃO permitido
+  if (!allowedOrigins.includes(origin)) {
+    reply.code(403).send({ error: "Forbidden" });
+    return;
+  }
+
+  done();
 });
 
 app.register(formbody);
