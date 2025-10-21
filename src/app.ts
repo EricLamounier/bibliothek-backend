@@ -31,7 +31,7 @@ const allowedOrigins = [
   "http://192.168.3.9:5173",            // dev local
   "https://192.168.3.9:5173"
 ];
-
+/*
 app.addHook("onRequest", (req, reply, done) => {
   const origin = req.headers.origin;
 
@@ -48,7 +48,7 @@ app.addHook("onRequest", (req, reply, done) => {
   }
 
   done();
-});
+});*/
 
 app.register(formbody);
 app.register(fastifyMultipart, {
