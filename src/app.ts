@@ -3,6 +3,7 @@ import formbody from '@fastify/formbody';
 import cors from '@fastify/cors';
 import fastifyMultipart from '@fastify/multipart';
 import cookie from '@fastify/cookie';
+import fs from 'fs';
 
 import authenticationRoute from './routes/auth.route';
 import editoraRoutes from './routes/editora.route';
@@ -14,13 +15,10 @@ import funcionarioRoutes from './routes/funcionario.route';
 import livroRoutes from './routes/livro.route';
 import emprestimoRoutes from './routes/emprestimo.route';
 import resetPasswordRoute from './routes/resetPassword.route';
-import fs from 'fs';
 import syncRoutes from './routes/sync';
 import requestLogger from './utils/requestLogger';
 import logsRoutes from './routes/logs';
 import postFeedback from './routes/feedBack';
-
-
 
 const app = Fastify({
   logger: {
@@ -47,6 +45,18 @@ app.register(cors, {
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 });
 
+// Rotas auxiliares
+app.get("/", async () => {
+  return { status: "API Running!", time: new Date().toISOString() };
+});
+app.get("/favicon.ico", async (_, reply) => {
+  return reply.code(204).send();
+});
+app.get("/favicon.png", async (_, reply) => {
+  return reply.code(204).send();
+});
+//
+
 app.register(cookie);
 app.register(requestLogger);
 
@@ -63,6 +73,5 @@ app.register(emprestimoRoutes, { prefix: '/emprestimo'});
 app.register(syncRoutes, { prefix: '/sync'});
 app.register(postFeedback, { prefix: '/feedback'});
 app.register(logsRoutes, { prefix: '/admin' });
-
 
 export default app;
