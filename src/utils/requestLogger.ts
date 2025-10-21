@@ -33,7 +33,9 @@ export default fp(async (fastify) => {
     const statusCode = isFinite(reply.statusCode) ? reply.statusCode : 0;
     const responseBody = (reply as any)._responsePayload;
 
+    if (url === '/') return;
     if (url === '/favicon.ico') return;
+    if (url === '/favicon.png') return;
     if (url === '/admin/logs') return;
     if (request.method === 'OPTIONS') return;
 
