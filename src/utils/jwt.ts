@@ -3,6 +3,7 @@ const dotenv = require('dotenv');
 const bcrypt = require('bcrypt');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 dotenv.config()
 const PRIVATE_KEY = fs.readFileSync(path.join(__dirname, '../../private.key'), 'utf8');
@@ -11,8 +12,15 @@ const PUBLIC_KEY = fs.readFileSync(path.join(__dirname, '../../public.key'), 'ut
 export const createJWT = async (funcionario: number | string) => {
   return jwt.sign({ funcionario }, PRIVATE_KEY, {
     algorithm: 'RS256',
-    expiresIn: '30d',
+    expiresIn: '1h',
   });
+};
+
+export const createRefreshToken = async (jwt: string) => {
+  return {
+    refresh: crypto.createHash('md5').update(jwt).digest("hex"),
+    expira_em: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 dias
+  }
 };
 
 export const verifyJWT = async (token: string) => {

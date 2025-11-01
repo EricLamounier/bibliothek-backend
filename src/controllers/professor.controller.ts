@@ -77,7 +77,6 @@ export const getProfessor = async (request: FastifyRequest, reply: FastifyReply)
         // filtro por disciplina
         if (disciplina) {
             const disciplinas = Array.isArray(disciplina) ? disciplina : [disciplina]
-            //console.log(disciplinas)
             const placeholders = disciplinas.map((_, i) => `$${paramIndex + i}`)
             conditions.push(`D.CODIGODISCIPLINA IN (${placeholders.join(',')})`)
             values.push(...disciplinas)

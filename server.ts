@@ -6,12 +6,6 @@ dotenv.config();
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = "0.0.0.0";
 
-// --- Rotas Extras ---
-app.get("/favicon.ico", (req, res) => res.status(204));
-app.get("/teste", (req, res) => {
-  res.status(200).send({ message: "ola" });
-});
-
 // --- Inicialização ---
 app.listen({ port: PORT, host: HOST }, (err, address) => {
   if (err) {

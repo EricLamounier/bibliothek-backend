@@ -1,7 +1,8 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import dotenv from 'dotenv';
+
 import pool from '../config/db';
-import { comparePassword, createJWT, hashPassword, verifyJWT } from '../utils/jwt';
+import { comparePassword, createJWT, createRefreshToken, hashPassword, verifyJWT } from '../utils/jwt';
 import { deleteImages, processAndUploadImageBase64 } from '../utils/imagekit';
 
 dotenv.config();
@@ -24,17 +25,22 @@ export const authLogin = async (request: FastifyRequest, reply: FastifyReply) =>
         }
 
         const JWTToken = await createJWT(rows[0]);
+        const {refresh, expira_em} = await createRefreshToken(JWTToken);
 
+        await pool.query('BEGIN');
+
+        const queryRefreshToken = 'INSERT INTO REFRESH_TOKENS (CODIGOFUNCIONARIO, TOKEN, EXPIRA_EM) VALUES ($1, $2, $3)';
+        await pool.query(queryRefreshToken, [rows[0].codigofuncionario, refresh, expira_em]);
+
+        await pool.query('COMMIT');
+
+        const data ={
+            token: JWTToken,
+            refresh: refresh
+        }
         reply
-            .setCookie('token', JWTToken, { // Correção do nome da variável
-                httpOnly: true,
-                maxAge: 3600000, // 1 hora
-                secure: true, // tesntando
-                sameSite: 'none',
-                path: '/',
-            })
             .code(200)
-            .send({ message: 'Logged successfully!', data: JWTToken});
+            .send({ message: 'Logged successfully!', data: data });
     }catch(err){
         console.log(err)
         reply.code(400).send({ message: 'Something went wrong!', data: err});
@@ -47,7 +53,7 @@ export const authJWT = async(request: FastifyRequest, reply: FastifyReply) => {
         if(!token){
             return reply.status(401).send({ message: 'Token not found!' });
         }
-        const resp = await verifyJWT(token)
+        const resp = await verifyJWT(token);
     
         if(resp){
             const query = `
@@ -57,8 +63,8 @@ export const authJWT = async(request: FastifyRequest, reply: FastifyReply) => {
                 FROM PESSOA PES JOIN FUNCIONARIO FUN ON PES.CODIGOPESSOA = FUN.CODIGOPESSOA
                 WHERE PES.TIPOPESSOA = 2 AND FUN.CODIGOPESSOA = $1 LIMIT 1
             `
-            const data = resp.funcionario.codigopessoa
-            const result = await pool.query(query, [data])
+            const data = resp.funcionario
+            const result = await pool.query(query, [data.codigopessoa])
             const funcionario = result.rows[0]
             const { senha, ...funcionarioFormated } = funcionario;
     
@@ -75,15 +81,65 @@ export const authJWT = async(request: FastifyRequest, reply: FastifyReply) => {
     }
 };
 
+export const refreshJWT = async(request: FastifyRequest, reply: FastifyReply) => {
+    try{
+        const refreshToken = request.body as { refresh: string };
+        if(!refreshToken.refresh){
+            return reply.status(401).send({ message: 'Token not found!' });
+        }
+
+        const refreshDB = await pool.query('SELECT * FROM REFRESH_TOKENS WHERE TOKEN = $1 LIMIT 1', [refreshToken.refresh]);
+        if(refreshDB.rows.length === 0){
+            return reply.status(401).send({ message: 'Invalid refresh token!' });
+        }
+
+        const expiresAt = refreshDB.rows[0].expira_em;
+        if(expiresAt <= new Date(Date.now())){
+            return reply.status(401).send({ message: 'Refresh token expired!' });
+        }
+
+        const funcionarioQuery = `
+            SELECT 
+                FUN.*,
+                PES.*
+            FROM PESSOA PES JOIN FUNCIONARIO FUN ON PES.CODIGOPESSOA = FUN.CODIGOPESSOA
+            WHERE PES.TIPOPESSOA = 2 AND FUN.CODIGOPESSOA = $1 LIMIT 1
+        `
+        const funcionario = await pool.query(funcionarioQuery, [refreshDB.rows[0].codigofuncionario]);
+
+        const newtoken = await createJWT(funcionario.rows[0]);
+        const {refresh, expira_em} = await createRefreshToken(newtoken);
+
+        await pool.query('BEGIN');
+
+        const queryRevokeRefreshToken = 'DELETE FROM REFRESH_TOKENS WHERE TOKEN = $1';
+        await pool.query(queryRevokeRefreshToken, [refreshToken]);
+
+        const queryRefreshToken = 'INSERT INTO REFRESH_TOKENS (CODIGOFUNCIONARIO, TOKEN, EXPIRA_EM) VALUES ($1, $2, $3)';
+        await pool.query(queryRefreshToken, [funcionario.rows[0].codigofuncionario, refresh, expira_em]);
+
+        await pool.query('COMMIT');
+
+        const data ={
+            token: newtoken,
+            refresh: refresh,
+            expira_em: expira_em
+        }
+        reply
+            .code(200)
+            .send({ message: 'Logged successfully!', data: data });
+    }catch(err){
+        console.log(err)
+        reply.code(400).send({ message: 'Something went wrong!', data: err});
+    }
+}
+
 export const logout = async (request: FastifyRequest, reply: FastifyReply) => {
+    const refresh = request.body as { refresh: string };
+        
+    await pool.query('DELETE FROM REFRESH_TOKENS WHERE TOKEN = $1', [refresh.refresh]);
+    
     reply
-      .clearCookie('token', {
-        httpOnly: true,
-        secure: true,          // igual ao que foi setado no login
-        sameSite: 'none',      // igual ao que foi setado no login
-        path: '/',             // igual ao que foi setado no login
-        expires: new Date(0), // data no passado
-      })
       .code(200)
       .send({ message: 'Logout realizado com sucesso!' });
   };

@@ -1,22 +1,10 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import pool from '../config/db';
-import { verifyJWT } from '../utils/jwt';
 import { deleteImages, processAndUploadImageBase64 } from '../utils/imagekit';
 
 export const getAluno = async (request: FastifyRequest, reply: FastifyReply) => {
     try{
-        const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
         const { aluno, situacao } = request.query as { aluno?: number, situacao?: string };
-
-        if(!token){
-            return reply.status(401).send({ message: 'Token not found!' });
-        }
-
-        const res = await verifyJWT(token);
-
-        if(!res){
-            return reply.status(401).send({ message: 'Expired section!', data: ''});
-        }
 
         let query = `
             SELECT
@@ -68,22 +56,11 @@ export const getAluno = async (request: FastifyRequest, reply: FastifyReply) => 
 };
 
 export const postAluno = async(request: FastifyRequest, reply: FastifyReply) => {
-    
-    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     const aluno = request.body as any;
 
     let imagemImageKit = null
     try{
-        if(!token){
-            return reply.status(401).send({ message: 'Token not found!' });
-        }
-
-        const res = await verifyJWT(token);
-
-        if(!res){
-            return reply.status(401).send({ message: 'Expired section!', data: ''});
-        }
 
         if (aluno.imagemBase64) {
             try {
@@ -123,22 +100,11 @@ export const postAluno = async(request: FastifyRequest, reply: FastifyReply) => 
 };
 
 export const putAluno = async (request: FastifyRequest, reply: FastifyReply) => {
-    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     const aluno = request.body as any;
 
     let imagemImageKit = null;
     try{
-
-        if(!token){
-            return reply.status(401).send({ message: 'Token not found!' });
-        }
-
-        const res = await verifyJWT(token);
-
-        if(!res){
-            return reply.status(401).send({ message: 'Expired section!', data: ''});
-        }
 
         const queryImagem = 'SELECT IMAGEM FROM PESSOA WHERE CODIGOPESSOA = $1 LIMIT 1';
         const { rows: [imagemBDId] } = await pool.query(queryImagem, [aluno.codigopessoa]);
@@ -193,21 +159,10 @@ export const putAluno = async (request: FastifyRequest, reply: FastifyReply) => 
 
 export const deleteAluno = async (request: FastifyRequest, reply: FastifyReply) => {
     const { aluno } = request.body as any;
-    const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
 
     try{
         if(!aluno){
             return reply.status(400).send({ message: "Aluno's ID required!" })
-        }
-
-        if(!token){
-            return reply.status(401).send({ message: 'Token not found!' });
-        }
-
-        const res = await verifyJWT(token);
-
-        if(!res){
-            return reply.status(401).send({ message: 'Expired section!', data: ''});
         }
 
         await pool.query('BEGIN');

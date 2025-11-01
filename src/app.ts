@@ -3,7 +3,6 @@ import formbody from '@fastify/formbody';
 import cors from '@fastify/cors';
 import fastifyMultipart from '@fastify/multipart';
 import cookie from '@fastify/cookie';
-import fs from 'fs';
 
 import authenticationRoute from './routes/auth.route';
 import editoraRoutes from './routes/editora.route';
@@ -29,6 +28,7 @@ const app = Fastify({
 const allowedOrigins = [
   "https://bibliothek-test.vercel.app", // produção
   "http://192.168.3.9:5173",            // dev local
+  "http://200.18.132.156:5173/",
   "https://192.168.3.9:5173"
 ];
 /*
@@ -61,8 +61,8 @@ app.register(cors, {
   origin: [
     "http://192.168.3.9:5173", 
     "https://192.168.3.9:5173", 
+    "http://200.18.132.156:5173/",
     "https://bibliothek-test.vercel.app",
-    "https://169.254.83.107:5173"
   ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -78,7 +78,6 @@ app.get("/favicon.ico", async (_, reply) => {
 app.get("/favicon.png", async (_, reply) => {
   return reply.code(204).send();
 });
-//
 
 app.register(cookie);
 app.register(requestLogger);
