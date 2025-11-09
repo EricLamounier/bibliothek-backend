@@ -2,23 +2,39 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import pool from '../config/db';
 import { verifyJWT } from '../utils/jwt';
 
-export const getEmprestimo = async(request: FastifyRequest, reply: FastifyReply) => {
-    
+export const getEmprestimo = async (request: FastifyRequest, reply: FastifyReply) => {
     const token = request.cookies.token || request.headers.authorization?.replace('Bearer ', '');
-    const { codigopessoa, livro, datainiciocriacao, datafimcriacao, datainiciodevolucao, datafimdevolucao, situacao } = request.query as { codigopessoa?: number[], livro?: number[], datainiciocriacao?: string, datafimcriacao?: string, datainiciodevolucao?: string, datafimdevolucao?: string, situacao?: string[] };
+    const {
+        codigopessoa,
+        livro,
+        datainiciocriacao,
+        datafimcriacao,
+        datainiciodevolucao,
+        datafimdevolucao,
+        situacao
+    } = request.query as {
+        codigopessoa?: number[],
+        livro?: number[],
+        datainiciocriacao?: string,
+        datafimcriacao?: string,
+        datainiciodevolucao?: string,
+        datafimdevolucao?: string,
+        situacao?: string[]
+    };
 
-    try{
-
-        if(!token){
+    try {
+        if (!token) {
             return reply.status(401).send({ message: 'Token not found!' });
         }
 
         const res = await verifyJWT(token);
-
-        if(!res){
-            return reply.status(401).send({ message: 'Expired section!', data: ''});
+        if (!res) {
+            return reply.status(401).send({ message: 'Expired session!', data: '' });
         }
 
+        // -------------------------------
+        // INÍCIO DA QUERY BASE
+        // -------------------------------
         let query = `
             SELECT 
                 EMP.*,
@@ -28,101 +44,125 @@ export const getEmprestimo = async(request: FastifyRequest, reply: FastifyReply)
                 CAST(SUM(EL.QUANTIDADEEMPRESTADA) AS INT) AS totalemprestado,
                 COALESCE(
                     JSON_AGG(
-                    DISTINCT 
-                    jsonb_build_object(
-                        'codigolivro',                  L.codigolivro,
-                        'titulo',              L.titulo,
-                        'quantidadeemprestada',          EL.quantidadeemprestada,
-                        'quantidadedevolvida', EL.quantidadedevolvida,
-                        'imagem', L.imagem,
-                        'imagem_url',
-                        CASE 
-                            WHEN L.imagem IS NOT NULL
-                            THEN 'ttps://ik.imagekit.io/bibliothek/LivrosImagens/' || L.imagem || '.png'
-                            ELSE NULL
-                        END,
-                        'codigoemprestimo', EMP.codigoemprestimo
-                    )
+                        DISTINCT jsonb_build_object(
+                            'codigolivro', L.codigolivro,
+                            'titulo', L.titulo,
+                            'quantidadeemprestada', EL.quantidadeemprestada,
+                            'quantidadedevolvida', EL.quantidadedevolvida,
+                            'imagem', L.imagem,
+                            'imagem_url',
+                            CASE 
+                                WHEN L.imagem IS NOT NULL
+                                THEN 'https://ik.imagekit.io/bibliothek/LivrosImagens/' || L.imagem || '.png'
+                                ELSE NULL
+                            END,
+                            'codigoemprestimo', EMP.codigoemprestimo
+                        )
                     ) FILTER (WHERE L.codigolivro IS NOT NULL),
                     '[]'
                 ) AS livros
-                FROM EMPRESTIMO EMP
-                JOIN PESSOA    PES ON PES.CODIGOPESSOA = EMP.CODIGOPESSOA
-                JOIN FUNCIONARIO FUN ON FUN.CODIGOFUNCIONARIO = EMP.CODIGOFUNCIONARIO
-                LEFT JOIN EMPRESTIMO_LIVRO EL ON EL.CODIGOEMPRESTIMO = EMP.CODIGOEMPRESTIMO
-                LEFT JOIN LIVRO L ON L.CODIGOLIVRO = EL.CODIGOLIVRO 
-            `;
-        let data = [];
-        let conditions: string[] = [];
+            FROM EMPRESTIMO EMP
+            JOIN PESSOA PES ON PES.CODIGOPESSOA = EMP.CODIGOPESSOA
+            JOIN FUNCIONARIO FUN ON FUN.CODIGOFUNCIONARIO = EMP.CODIGOFUNCIONARIO
+            LEFT JOIN EMPRESTIMO_LIVRO EL ON EL.CODIGOEMPRESTIMO = EMP.CODIGOEMPRESTIMO
+            LEFT JOIN LIVRO L ON L.CODIGOLIVRO = EL.CODIGOLIVRO
+        `;
+
+        // -------------------------------
+        // CONDIÇÕES
+        // -------------------------------
+        let whereConditions: string[] = [];
+        let havingConditions: string[] = [];
+        let data: any[] = [];
         let paramIndex = 1;
 
-        if(situacao){
-            const situacoes = Array.isArray(situacao) ? situacao : [situacao];
-            const statusConditions: string[] = [];
-            
-            if(situacoes.includes('0')){ // Pendente
-                statusConditions.push(`(EL.quantidadedevolvida < EL.quantidadeemprestada)`);
-            }
-            if(situacoes.includes('1')){ // Atrasado
-                statusConditions.push(`(EL.quantidadedevolvida < EL.quantidadeemprestada AND CURRENT_DATE > EMP.DATADEVOLUCAOPREVISTA)`);
-            }
-            if(situacoes.includes('2')){ // Devolvido
-                statusConditions.push(`(EL.quantidadedevolvida = EL.quantidadeemprestada)`);
-            }
-            
-            if(statusConditions.length > 0) {
-                conditions.push(`(${statusConditions.join(' OR ')})`);
-            }
-        }        
-
+        // --- FILTROS NORMAIS (WHERE) ---
         if (codigopessoa) {
-            const pessoas = Array.isArray(codigopessoa) ? codigopessoa : [codigopessoa]
-            const placeholders = pessoas.map((_, i) => `$${paramIndex + i}`)
-            conditions.push(`EMP.CODIGOPESSOA IN (${placeholders.join(',')})`)
-            data.push(...pessoas)
-            paramIndex += pessoas.length
+            const pessoas = Array.isArray(codigopessoa) ? codigopessoa : [codigopessoa];
+            const placeholders = pessoas.map((_, i) => `$${paramIndex + i}`);
+            whereConditions.push(`EMP.CODIGOPESSOA IN (${placeholders.join(',')})`);
+            data.push(...pessoas);
+            paramIndex += pessoas.length;
         }
+
         if (livro) {
-            const livros = Array.isArray(livro) ? livro : [livro]
-            const placeholders = livros.map((_, i) => `$${paramIndex + i}`)
-            conditions.push(`EL.CODIGOLIVRO IN (${placeholders.join(',')})`)
-            data.push(...livros)
-            paramIndex += livros.length
+            const livros = Array.isArray(livro) ? livro : [livro];
+            const placeholders = livros.map((_, i) => `$${paramIndex + i}`);
+            whereConditions.push(`EL.CODIGOLIVRO IN (${placeholders.join(',')})`);
+            data.push(...livros);
+            paramIndex += livros.length;
         }
+
         if (datainiciocriacao) {
-            conditions.push(`EMP.DATAEMPRESTIMO >= $${paramIndex}`);
+            whereConditions.push(`EMP.DATAEMPRESTIMO::date >= $${paramIndex}`);
             data.push(datainiciocriacao);
-            paramIndex += 1
+            paramIndex++;
         }
         if (datafimcriacao) {
-            conditions.push(`EMP.DATAEMPRESTIMO <= $${paramIndex}`);
+            whereConditions.push(`EMP.DATAEMPRESTIMO::date <= $${paramIndex}`);
             data.push(datafimcriacao);
-            paramIndex += 1
+            paramIndex++;
         }
         if (datainiciodevolucao) {
-            conditions.push(`EMP.DATADEVOLUCAO >= $${paramIndex}`);
+            whereConditions.push(`EMP.DATADEVOLUCAO::date >= $${paramIndex}`);
             data.push(datainiciodevolucao);
-            paramIndex += 1
+            paramIndex++;
         }
         if (datafimdevolucao) {
-            conditions.push(`EMP.DATADEVOLUCAO <= $${paramIndex}`);
+            whereConditions.push(`EMP.DATADEVOLUCAO::date <= $${paramIndex}`);
             data.push(datafimdevolucao);
-            paramIndex += 1
+            paramIndex++;
         }
-        
-        if (conditions.length > 0) {
-            query += ` WHERE ` + conditions.join(' AND ');
-        }
-        
-        query += ' GROUP BY EMP.CODIGOEMPRESTIMO, PES.CODIGOPESSOA, PES.NOME;';
-        const {rows} = await pool.query(query, data);
 
-        reply.status(200).send({ message: 'Emprestimo found successfully!', data:  rows});
-    }catch(err){
-        console.log(err)
+        // --- FILTRO POR SITUAÇÃO (HAVING, pois depende de SUM) ---
+        if (situacao) {
+            const situacoes = Array.isArray(situacao) ? situacao : [situacao];
+            const statusConditions: string[] = [];
+
+            if (situacoes.includes('1')) { // Pendente
+                statusConditions.push(`SUM(EL.QUANTIDADEDEVOLVIDA) < SUM(EL.QUANTIDADEEMPRESTADA)`);
+            }
+            if (situacoes.includes('0')) { // Atrasado
+                statusConditions.push(`SUM(EL.QUANTIDADEDEVOLVIDA) < SUM(EL.QUANTIDADEEMPRESTADA) AND CURRENT_DATE > MAX(EMP.DATADEVOLUCAOPREVISTA)`);
+            }
+            if (situacoes.includes('2')) { // Devolvido
+                statusConditions.push(`SUM(EL.QUANTIDADEDEVOLVIDA) = SUM(EL.QUANTIDADEEMPRESTADA)`);
+            }
+
+            if (statusConditions.length > 0) {
+                havingConditions.push(`(${statusConditions.join(' OR ')})`);
+            }
+        }
+
+        // -------------------------------
+        // MONTAGEM FINAL DA QUERY
+        // -------------------------------
+        if (whereConditions.length > 0) {
+            query += ` WHERE ${whereConditions.join(' AND ')}`;
+        }
+
+        query += `
+            GROUP BY EMP.CODIGOEMPRESTIMO, PES.CODIGOPESSOA, PES.NOME
+        `;
+
+        if (havingConditions.length > 0) {
+            query += ` HAVING ${havingConditions.join(' OR ')}`;
+        }
+
+        query += ';';
+
+        // -------------------------------
+        // EXECUÇÃO
+        // -------------------------------
+        const { rows } = await pool.query(query, data);
+
+        reply.status(200).send({ message: 'Emprestimo found successfully!', data: rows });
+    } catch (err) {
+        console.error(err);
         reply.status(500).send({ message: 'Emprestimo not found!', data: err });
     }
-}
+};
+
 
 export const getExisteEmprestimoAberto = async(request: FastifyRequest, reply: FastifyReply) => {
     
