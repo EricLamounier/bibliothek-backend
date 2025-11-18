@@ -6,6 +6,12 @@
       "runtime": "@vercel/node@3.2.13",
       "memory": 1024,
       "maxDuration": 10
+    },
+    "api/cleanup-tokens.ts": {
+      "runtime": "@vercel/node@3.2.13",
+      "memory": 1024,
+      "maxDuration": 10,
+      "schedule": "* * * * *"
     }
   },
   "rewrites": [
