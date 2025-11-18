@@ -10,10 +10,15 @@
     "api/cleanup-tokens.ts": {
       "runtime": "@vercel/node@3.2.13",
       "memory": 1024,
-      "maxDuration": 10,
-      "schedule": "* * * * *"
+      "maxDuration": 10
     }
   },
+  "crons": [
+    {
+      "path": "/api/cleanup-tokens",
+      "schedule": "0 0 * * *"
+    }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/api/index" }
   ]
